@@ -17,9 +17,9 @@ Le frontend est en HTML/CSS/JavaScript, sans framework. Un Worker TypeScript ser
 
 Pour chaque message, le serveur retrouve le fil et les notes approuvées. Le LLM choisit une intention de conversation — clarifier, reformuler, explorer ou clôturer — et formule sa réponse dans un schéma JSON vérifié. Le choix et la réponse sont enregistrés. Le contenu de la bulle suit les questions originales du PDF ; le modèle identifie où en est l’échange et traite les demandes de clarification ou d’arrêt.
 
-En vocal, Realtime suit les 14 questions du protocole Kedo présentes dans ses instructions. La détection native `semantic_vad` avec `eagerness: medium`, `create_response: true` et `interrupt_response: true` gère entièrement la prise de parole. Le navigateur demande uniquement le premier accueil ; les réponses suivantes sont créées côté OpenAI sans minuterie, validation de transcription ou autorisation audio côté client.
+En vocal, Realtime suit les 14 questions du protocole Kedo présentes dans ses instructions. La détection native `semantic_vad` avec `eagerness: medium`, `create_response: true` et `interrupt_response: true` gère entièrement la prise de parole. Le navigateur demande uniquement le premier accueil avec sa formulation exacte ; les réponses suivantes sont créées côté OpenAI sans minuterie, validation de transcription ou autorisation audio côté client.
 
-L’interface reçoit les événements pour afficher l’état et sauvegarder les transcriptions. Une transcription manquante ne suspend pas l’appel. Les minuteries restantes ne font que fermer proprement une connexion bloquée ou limiter l’appel à dix minutes. Le nettoyage de l’appel est tolérant aux erreurs : une fermeture de canal qui échoue ne laisse pas le micro et l’interface coincés.
+L’interface reçoit les événements pour afficher l’état et sauvegarder les transcriptions. Une transcription manquante ne suspend pas l’appel. Les minuteries restantes ne font que fermer proprement une connexion bloquée en cas de panne du fournisseur. Le nettoyage de l’appel est tolérant aux erreurs : une fermeture de canal qui échoue ne laisse pas le micro et l’interface coincés.
 
 La fidélité aux questions est demandée au modèle et vérifiée dans les essais ; il n’y a plus de curseur navigateur qui pourrait bloquer la suite. Les décisions texte affichées ne sont pas une trace du raisonnement interne ni une analyse de la séance vocale.
 
@@ -29,7 +29,7 @@ Sur demande, une seconde tâche LLM propose les notes de fin de séance. Cette p
 
 - `gpt-4.1-mini` : messages et propositions de notes via Responses, `store: false`.
 - `gpt-realtime-2.1` : conversation audio WebRTC ; voix `marin`.
-- `gpt-4o-mini-transcribe` : transcription de la parole, langue française.
+- `gpt-4o-transcribe` : transcription de la parole, en français ou anglais selon le choix de la personne.
 
 Les noms texte et voix se changent dans `wrangler.jsonc`. L’accès à ces modèles a été confirmé pour le compte de l’équipe.
 
@@ -45,4 +45,4 @@ L’audio brut n’est pas enregistré par notre application. Le transport audio
 
 Pas de compte multiappareil, agenda, notifications ni Notion. L’appel nécessite HTTPS ou localhost. La clôture tente de raccrocher côté OpenAI puis sauvegarde les transcriptions reçues ; une page fermée brutalement peut les perdre. Les réponses interrompues sont exclues de la transcription enregistrée pour ne pas conserver comme entendue leur partie non jouée.
 
-Le minuteur de dix minutes est dans le navigateur. Les quotas serveur limitent les ouvertures et demandes, mais ne garantissent pas un plafond de dépense. Le code partagé et ces quotas sont adaptés à un petit essai d’équipe, pas à une ouverture publique sans contrôle.
+Les quotas de messages, notes proposées et appels ainsi que le minuteur de dix minutes ont été retirés. Une session Realtime reste limitée à 60 minutes par OpenAI. Les garde-fous de connexion, l’isolation des espaces et la limitation des tentatives de connexion demeurent. Le code partagé est destiné aux essais privés.

@@ -1,13 +1,16 @@
+import { QUESTIONS, QUESTIONS_EN } from './coaching-protocol.js?v=0.3.0';
+import { t, getLanguage, initLanguage, setLanguage } from './i18n.js?v=0.3.0';
+initLanguage(document);
 
 const $ = id => document.getElementById(id);
 let state = { threads: [], messages: [], notes: [], decisions: [], threadId: null };
 let authenticated = false, initialized = false, busy = false, editingNote = null, call = null, pendingSave = null;
-const date = ms => new Intl.DateTimeFormat('fr-FR', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }).format(ms);
-function error(message='',tone='error') { $('error').textContent = message; $('error').hidden = !message; $('error').dataset.tone=tone; }
+const date = ms => new Intl.DateTimeFormat(getLanguage()==='en'?'en-GB':'fr-FR', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }).format(ms);
+function error(message='',tone='error') { $('error').textContent = t(message); $('error').hidden = !message; $('error').dataset.tone=tone; }
 async function api(path, data, method = data ? 'POST' : 'GET') {
-  const response = await fetch(`/api/${path}`, {method,headers:data ? {'Content-Type':'application/json'} : {},body:data ? JSON.stringify(data) : undefined});
+  const response = await fetch(`/api/${path}`, {method,headers:data ? {'Content-Type':'application/json'} : {},body:data ? JSON.stringify({language:getLanguage(),...data}) : undefined});
   const result = await response.json();
-  if (!response.ok) { const e = new Error(result.error || 'La demande a échoué.'); e.status=response.status; throw e; }
+  if (!response.ok) { const e = new Error(t(result.error) || t('La demande a échoué.')); e.status=response.status; throw e; }
   return result;
 }
 function node(tag, className, content) { const n = document.createElement(tag); if (className) n.className=className; if (content !== undefined) n.textContent=content; return n; }
@@ -16,7 +19,10 @@ function updateControls() {
   $('send-button').disabled = !initialized || busy || Boolean(call) || !navigator.onLine;
   $('call-button').disabled = !initialized || busy || Boolean(call) || Boolean(pendingSave) || !navigator.onLine;
   $('new-thread').disabled = !initialized || busy || Boolean(call) || Boolean(pendingSave);
-  $('add-note').disabled = !initialized;
+  $('add-note').disabled = !initialized || busy || Boolean(call);
+  $('language').disabled=busy||Boolean(call)||Boolean(pendingSave);
+  $('microphone').disabled=Boolean(call);
+  $('erase-button').disabled=busy||Boolean(call)||Boolean(pendingSave);
   $('message').disabled = Boolean(call);
   $('draft-button').disabled = busy || Boolean(call) || Boolean(pendingSave) || !state.messages.some(m=>m.role==='user');
   $('typing').hidden=!busy;
@@ -24,25 +30,32 @@ function updateControls() {
 function render() {
   $('welcome').hidden = state.messages.length > 0 || Boolean(call);
   $('messages').replaceChildren(...state.messages.map(m=>{
-    const row=node('div',`bubble-row ${m.role}`); row.append(node('span','bubble-label',m.role==='user' ? 'Toi' : 'La Bulle'),node('div','bubble',m.text));
-    if (m.source==='voice') row.firstChild.textContent += ' · appel';
+    const row=node('div',`bubble-row ${m.role}`); row.append(node('span','bubble-label',m.role==='user' ? t('Toi') : 'La Bulle'),node('div','bubble',m.text));
+    if (m.source==='voice') row.firstChild.textContent += t(' · appel');
+    if(m.source==='voice' && m.role==='user') {
+      const actions=node('div','note-actions');
+      const edit=node('button','',t('Corriger'));edit.disabled=busy||Boolean(call)||Boolean(pendingSave);edit.onclick=()=>{editingTranscript=m.id;$('transcript-text').value=m.text;$('transcript-error').textContent='';$('transcript-dialog').showModal();};
+      const remove=node('button','',t('Effacer'));remove.disabled=edit.disabled;remove.onclick=()=>guard(async()=>{if(await confirm(t('Effacer ce passage ?'),t('Il ne sera plus utilisé pour préparer les prochaines notes.'))){await api(`messages/${m.id}`,undefined,'DELETE');await load();}});
+      actions.append(edit,remove);row.append(actions);
+    }
     return row;
   }));
-  $('threads').replaceChildren(...state.threads.map((t,index)=>{
-    const button=node('button','thread-button',`Séance du ${date(t.created_at)}`); button.setAttribute('aria-current',String(t.id===state.threadId));
-    button.disabled=Boolean(call)||busy||Boolean(pendingSave); button.addEventListener('click',()=>guard(async()=>{await load(t.id);}));return button;
+  $('threads').replaceChildren(...state.threads.map((session)=>{
+    const button=node('button','thread-button',`${t('Séance du ')}${date(session.created_at)}`); button.setAttribute('aria-current',String(session.id===state.threadId));
+    button.disabled=Boolean(call)||busy||Boolean(pendingSave); button.addEventListener('click',()=>guard(async()=>{await load(session.id);}));return button;
   }));
-  if (!state.threads.length) $('threads').append(node('p','muted small','Ton premier échange commence ici.'));
+  if (!state.threads.length) $('threads').append(node('p','muted small',t('Ton premier échange commence ici.')));
   $('notes').replaceChildren(...state.notes.map(n=>{
     const card=node('article','note');const time=node('time','',date(n.created_at));time.dateTime=new Date(n.created_at).toISOString();card.append(time,node('p','',n.text));
-    const actions=node('div','note-actions');const edit=node('button','','Modifier');edit.addEventListener('click',()=>openNote(n.text,n.id));
-    const remove=node('button','','Effacer');remove.addEventListener('click',()=>guard(async()=>{if(await confirm('Effacer cette note ?','Elle ne sera plus utilisée par le coach lors des prochaines séances.')){await api(`notes/${n.id}`,undefined,'DELETE');await load();}}));
+    const actions=node('div','note-actions');const edit=node('button','',t('Modifier'));edit.addEventListener('click',()=>openNote(n.text,n.id));
+    const remove=node('button','',t('Effacer'));remove.addEventListener('click',()=>guard(async()=>{if(await confirm(t('Effacer cette note ?'),t('Elle ne sera plus utilisée par le coach lors des prochaines séances.'))){await api(`notes/${n.id}`,undefined,'DELETE');await load();}}));
     actions.append(edit,remove);card.append(actions);return card;
   }));
   $('note-empty').hidden=state.notes.length>0;
-  $('decisions').replaceChildren(...state.decisions.map(d=>node('li','',`${date(d.created_at)} · ${d.action}`)));
-  if(!state.decisions.length)$('decisions').append(node('li','','Les choix apparaîtront après un message.'));
-  $('mode-label').textContent=authenticated ? 'Coach IA · tes silences ont leur place.' : 'Un coach IA, du temps pour réfléchir.';
+  $('decisions').replaceChildren(...state.decisions.map(d=>node('li','',`${date(d.created_at)} · ${t(d.action)}`)));
+  if(!state.decisions.length)$('decisions').append(node('li','',t('Les choix apparaîtront après un message.')));
+  $('mode-label').textContent=authenticated ? t('Coach IA · tes silences ont leur place.') : t('Un coach IA, du temps pour réfléchir.');
+  renderFeedback();
   updateControls();
 }
 async function load(threadId=state.threadId) { state=await api(`state${threadId ? `?thread=${encodeURIComponent(threadId)}`:''}`);authenticated=true;render(); }
@@ -74,7 +87,7 @@ $('new-thread').onclick=()=>guard(async()=>{if(!access()||call||busy||pendingSav
 $('add-note').onclick=()=>{if(access())openNote();};
 $('draft-button').onclick=()=>guard(async()=>{
   if(!access()||busy||call||pendingSave)return;busy=true;updateControls();
-  try{const r=await api('draft',{threadId:state.threadId});if(!r.text){error('Le coach ne propose pas de note pour cet échange. Tu peux en écrire une avec le bouton +.');return;}openNote(r.text);}
+  try{const r=await api('draft',{threadId:state.threadId});if(!r.text){error(t('Le coach ne propose pas de note pour cet échange. Tu peux en écrire une avec le bouton +.'));return;}openNote(r.text);}
   finally{busy=false;updateControls();}
 });
 $('note-form').addEventListener('submit',async event=>{
@@ -83,8 +96,8 @@ $('note-form').addEventListener('submit',async event=>{
   catch(e){$('note-error').textContent=e.message;}finally{$('note-save').disabled=false;}
 });
 $('erase-button').onclick=()=>guard(async()=>{
-  if(call){error('Termine l’appel avant d’effacer ton espace.');return;}
-  if(await confirm('Effacer tout mon espace ?','Le fil, les transcriptions et les notes de ce navigateur seront supprimés du serveur. Cette action est définitive.')){
+  if(call){error(t('Termine l’appel avant d’effacer ton espace.'));return;}
+  if(await confirm(t('Effacer tout mon espace ?'),t('Tes échanges, notes, retours et données d’appels seront supprimés de notre base active. Les journaux OpenAI et sauvegardes Cloudflare suivent leurs propres délais de conservation.'))){
     await api('data',undefined,'DELETE');authenticated=false;state={threads:[],messages:[],notes:[],decisions:[],threadId:null};render();
   }
 });
@@ -92,8 +105,8 @@ $('erase-button').onclick=()=>guard(async()=>{
 function send(c,event) {if(call===c && c.channel?.readyState==='open')c.channel.send(JSON.stringify(event));}
 function callStatus(c,label,speaking=false){
   if(call!==c)return;
-  $('call-status').textContent=label;
-  $('call-hint').textContent='Parle naturellement. Tu peux interrompre le coach.';
+  $('call-status').textContent=t(label);
+  $('call-hint').textContent=t('Parle naturellement. Tu peux interrompre le coach.');
   $('call-panel').dataset.state=speaking?'speaking':'listening';
 }
 function interrupted(c){
@@ -104,73 +117,76 @@ function transcript(c,key,role) {if(!c.transcript.has(key))c.transcript.set(key,
 function handleEvent(c,e) {
   if(call!==c)return;
   if(e.type==='input_audio_buffer.speech_started'){
+    if(c.playing)c.interruptions++;
     clearTimeout(c.responseTimer);c.speaking=true;
-    transcript(c,e.item_id,'user');interrupted(c);callStatus(c,'Je t’écoute.',true);
+    transcript(c,e.item_id,'user');interrupted(c);callStatus(c,t('Je t’écoute.'),true);
   }else if(e.type==='input_audio_buffer.speech_stopped'){
-    c.speaking=false;callStatus(c,'Le coach prépare sa réponse…');
+    c.speaking=false;callStatus(c,t('Le coach prépare sa réponse…'));
     clearTimeout(c.responseTimer);
-    c.responseTimer=setTimeout(()=>{if(call===c)void endCall('Le service vocal ne répond plus. Tu peux relancer l’appel.');},30000);
+    c.responseTimer=setTimeout(()=>{if(call===c)void endCall(t('Le service vocal ne répond plus. Tu peux relancer l’appel.'));},30000);
   }else if(e.type==='conversation.item.input_audio_transcription.completed'){
     transcript(c,e.item_id,'user').text=e.transcript||'';
   }else if(e.type==='conversation.item.input_audio_transcription.failed'){
+    c.transcriptionFailures++;
     // Transcription is for the saved notes; native audio turn-taking continues.
-    error('Un passage n’a pas pu être transcrit. La conversation continue.','info');
+    error(t('Un passage n’a pas pu être transcrit. La conversation continue.'),'info');
   }else if(e.type==='response.created'){
     clearTimeout(c.responseTimer);c.responseId=e.response.id;
-    c.responseTimer=setTimeout(()=>{if(call===c)void endCall('Le service vocal ne répond plus. Tu peux relancer l’appel.');},45000);
-    callStatus(c,'Le coach prépare sa réponse…');
+    c.responseTimer=setTimeout(()=>{if(call===c)void endCall(t('Le service vocal ne répond plus. Tu peux relancer l’appel.'));},45000);
+    callStatus(c,t('Le coach prépare sa réponse…'));
   }else if(e.type==='response.output_item.added' && e.item?.role==='assistant'){
     c.currentItems.add(e.item.id);transcript(c,e.item.id,'assistant');
   }else if(e.type==='response.output_audio_transcript.done'){
     transcript(c,e.item_id,'assistant').text=e.transcript||'';
   }else if(e.type==='output_audio_buffer.started'){
-    c.playing=true;callStatus(c,'Le coach te répond.');
+    c.playing=true;callStatus(c,t('Le coach te répond.'));
   }else if(e.type==='output_audio_buffer.cleared'){
-    interrupted(c);callStatus(c,'Je t’écoute.',c.speaking);
+    interrupted(c);callStatus(c,t('Je t’écoute.'),c.speaking);
   }else if(e.type==='output_audio_buffer.stopped'){
-    c.playing=false;c.currentItems.clear();callStatus(c,'Je t’écoute.',c.speaking);
+    c.playing=false;c.currentItems.clear();callStatus(c,t('Je t’écoute.'),c.speaking);
   }else if(e.type==='response.done'){
     if(e.response?.id!==c.responseId)return;
     clearTimeout(c.responseTimer);
     if(e.response.status==='failed'||e.response.status==='incomplete'){
-      void endCall('Le service vocal n’a pas pu terminer sa réponse. Tu peux relancer l’appel.');
+      void endCall(t('Le service vocal n’a pas pu terminer sa réponse. Tu peux relancer l’appel.'));
     }
   }else if(e.type==='error'){
     console.warn('voice_error',e.error?.code||'unknown');
-    void endCall('La connexion vocale a rencontré une erreur. Tu peux relancer l’appel.');
+    void endCall(t('La connexion vocale a rencontré une erreur. Tu peux relancer l’appel.'));
   }
 }
 async function startCall(){
   if(!access()||call||busy||pendingSave)return;
-  if(!navigator.mediaDevices?.getUserMedia)throw new Error('Le micro nécessite HTTPS ou localhost et un navigateur compatible.');
+  if(!navigator.mediaDevices?.getUserMedia)throw new Error(t('Le micro nécessite HTTPS ou localhost et un navigateur compatible.'));
   busy=true;updateControls();
   try{await ensureThread();}finally{busy=false;updateControls();}
-  const c={peer:new RTCPeerConnection(),audio:new Audio(),stream:null,channel:null,callId:null,sequence:0,transcript:new Map(),currentItems:new Set(),responseId:null,speaking:false,playing:false,ending:false};
-  call=c;render();$('call-panel').hidden=false;$('call-status').textContent='Autorise le micro pour commencer.';$('call-time').textContent='00:00';
+  const c={peer:new RTCPeerConnection(),audio:new Audio(),stream:null,channel:null,callId:null,sequence:0,transcript:new Map(),currentItems:new Set(),responseId:null,speaking:false,playing:false,ending:false,interruptions:0,transcriptionFailures:0};
+  call=c;render();$('call-panel').hidden=false;$('call-status').textContent=t('Autorise le micro pour commencer.');$('call-time').textContent='00:00';
   c.audio.autoplay=true;
   try{
     const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
     if(call!==c){stream.getTracks().forEach(t=>t.stop());return;}
     c.stream=stream;stream.getTracks().forEach(t=>c.peer.addTrack(t,stream));
-    c.peer.ontrack=e=>{c.audio.srcObject=e.streams[0]||new MediaStream([e.track]);c.audio.play().catch(()=>{void endCall('Le navigateur bloque le son. Autorise la lecture audio puis relance l’appel.');});};
+    c.peer.ontrack=e=>{c.audio.srcObject=e.streams[0]||new MediaStream([e.track]);c.audio.play().catch(()=>{void endCall(t('Le navigateur bloque le son. Autorise la lecture audio puis relance l’appel.'));});};
     c.channel=c.peer.createDataChannel('oai-events');
-    c.channel.onmessage=e=>{try{handleEvent(c,JSON.parse(e.data));}catch{void endCall('La connexion vocale a rencontré un problème. Tu peux relancer l’appel.');}};
+    c.channel.onmessage=e=>{try{handleEvent(c,JSON.parse(e.data));}catch{void endCall(t('La connexion vocale a rencontré un problème. Tu peux relancer l’appel.'));}};
     c.channel.onopen=()=>{
-      if(call!==c)return;clearTimeout(c.connectionTimer);c.started=Date.now();callStatus(c,'Le coach prépare sa réponse…');
-      c.ticker=setInterval(()=>{const seconds=Math.floor((Date.now()-c.started)/1000);$('call-time').textContent=`${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`;if(seconds>=600)void endCall('Les dix minutes sont écoulées. Tu peux garder quelques notes.');},1000);
+      if(call!==c)return;clearTimeout(c.connectionTimer);c.started=Date.now();callStatus(c,t('Le coach prépare sa réponse…'));
+      c.ticker=setInterval(()=>{const seconds=Math.floor((Date.now()-c.started)/1000);$('call-time').textContent=`${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`;},1000);
       // Native VAD creates all later responses; the client only requests the greeting.
-      send(c,{type:'response.create'});
-      c.responseTimer=setTimeout(()=>{if(call===c)void endCall('Le coach ne répond pas. Tu peux relancer l’appel.');},20000);
+      const greeting=(getLanguage()==='en'?QUESTIONS_EN:QUESTIONS)[0];
+      send(c,{type:'response.create',response:{instructions:`This is a new coaching call. Say only this exact opening, without introduction or extra words: ${greeting}`}});
+      c.responseTimer=setTimeout(()=>{if(call===c)void endCall(t('Le coach ne répond pas. Tu peux relancer l’appel.'));},20000);
     };
-    c.channel.onclose=()=>{if(call===c&&!c.ending)void endCall('La connexion audio a été fermée.');};
-    c.peer.onconnectionstatechange=()=>{if(call!==c||c.ending)return;if(['failed','disconnected'].includes(c.peer.connectionState))void endCall('La connexion a été interrompue. Les propos reçus sont conservés si possible.');};
+    c.channel.onclose=()=>{if(call===c&&!c.ending)void endCall(t('La connexion audio a été fermée.'));};
+    c.peer.onconnectionstatechange=()=>{if(call!==c||c.ending)return;if(['failed','disconnected'].includes(c.peer.connectionState))void endCall(t('La connexion a été interrompue. Les propos reçus sont conservés si possible.'));};
     const offer=await c.peer.createOffer();await c.peer.setLocalDescription(offer);
-    $('call-status').textContent='Connexion au coach…';
-    const result=await api('call',{threadId:state.threadId,sdp:offer.sdp});c.callId=result.callId;
+    $('call-status').textContent=t('Connexion au coach…');
+    const result=await api('call',{threadId:state.threadId,sdp:offer.sdp,microphone:$('microphone').value});c.callId=result.callId;
     if(call!==c){await api('call/end',{callId:c.callId,messages:[]});return;}
     await c.peer.setRemoteDescription({type:'answer',sdp:result.sdp});
-    c.connectionTimer=setTimeout(()=>{if(call===c&&c.channel.readyState!=='open')void endCall('La connexion audio n’a pas abouti. Réessaie.');},20000);
-  }catch(e){await endCall();throw new Error(e.name==='NotAllowedError'?'Le micro n’est pas autorisé. Tu peux continuer par écrit ou autoriser le micro dans ton navigateur.':e.message);}
+    c.connectionTimer=setTimeout(()=>{if(call===c&&c.channel.readyState!=='open')void endCall(t('La connexion audio n’a pas abouti. Réessaie.'));},20000);
+  }catch(e){await endCall();throw new Error(e.name==='NotAllowedError'?t('Le micro n’est pas autorisé. Tu peux continuer par écrit ou autoriser le micro dans ton navigateur.'):e.message);}
 }
 async function saveCall(){
   if(!pendingSave)return;
@@ -183,21 +199,58 @@ async function endCall(message=''){
   call=null;$('call-panel').hidden=true;
   for(const cleanup of [()=>c.stream?.getTracks().forEach(t=>t.stop()),()=>c.channel?.close(),()=>c.peer.close(),()=>c.audio.pause(),()=>{c.audio.srcObject=null;}]){try{cleanup();}catch{}}
   const messages=[...c.transcript.values()].sort((a,b)=>a.order-b.order).filter(m=>m.text.trim()&&!m.interrupted).map(m=>({role:m.role,text:m.text}));
-  if(c.callId)pendingSave={callId:c.callId,messages};
-  try{await saveCall();if(message)error(message);else if(messages.length)error('Appel terminé. Tu peux relire le fil et choisir « Garder quelques notes ».','info');}
-  catch{error('La transcription n’a pas encore été sauvegardée. Garde cette page ouverte et utilise « Réessayer la sauvegarde ».');}
-  render();if(pendingSave){const retry=node('button','text-button','Réessayer la sauvegarde');retry.onclick=()=>guard(async()=>{await saveCall();error();render();});$('error').append(retry);}scrollFeed();
+  if(c.callId)feedbackChoice=c.callId;
+  if(c.callId)pendingSave={callId:c.callId,messages,durationSeconds:c.started?Math.floor((Date.now()-c.started)/1000):0,interruptions:c.interruptions,transcriptionFailures:c.transcriptionFailures,outcome:message?'error':'ended'};
+  try{await saveCall();if(message)error(message);else if(messages.length)error(t('Appel terminé. Tu peux relire le fil et choisir « Garder quelques notes ».'),'info');}
+  catch{error(t('La transcription n’a pas encore été sauvegardée. Garde cette page ouverte et utilise « Réessayer la sauvegarde ».'));}
+  render();if(pendingSave){const retry=node('button','text-button',t('Réessayer la sauvegarde'));retry.onclick=()=>guard(async()=>{await saveCall();error();render();});$('error').append(retry);}scrollFeed();
 }
 $('call-button').onclick=()=>guard(startCall);
 $('hangup-button').onclick=()=>{void endCall();};
-window.addEventListener('offline',()=>{document.body.classList.add('offline');error('Tu es hors connexion. Ton message reste ici.');if(call)void endCall('Connexion perdue. Garde cette page ouverte pour sauvegarder le fil.');updateControls();});
+window.addEventListener('offline',()=>{document.body.classList.add('offline');error(t('Tu es hors connexion. Ton message reste ici.'));if(call)void endCall(t('Connexion perdue. Garde cette page ouverte pour sauvegarder le fil.'));updateControls();});
 window.addEventListener('online',()=>{document.body.classList.remove('offline');updateControls();if(pendingSave)void guard(saveCall);else error();});
 window.addEventListener('beforeunload',event=>{if(call||pendingSave){event.preventDefault();event.returnValue='';}});
 window.addEventListener('pagehide',()=>{if(call){call.stream?.getTracks().forEach(t=>t.stop());call.peer.close();}});
 
+let feedbackCall=null,editingTranscript=null,feedbackChoice=null;
+const selectedFeedbackCall=()=>state.calls?.find(c=>c.id===feedbackChoice)??state.calls?.[0];
+function renderFeedback(){
+  const recent=selectedFeedbackCall();
+  $('feedback-panel').hidden=!recent||Boolean(call)||Boolean(pendingSave);
+  if(!recent)return;
+  feedbackChoice=recent.id;
+  $('feedback-call-picker').hidden=state.calls.length<2;
+  $('feedback-call').replaceChildren(...state.calls.map(c=>{const option=node('option','',date(c.ended_at));option.value=c.id;return option;}));
+  $('feedback-call').value=recent.id;
+  $('feedback-prompt').textContent=t(recent.clarity===null?'Comment as-tu vécu cette bulle ? Ton retour est facultatif.':'Ton retour a été partagé avec l’équipe.');
+  $('feedback-button').textContent=t(recent.clarity===null?'Donner mon avis':'Modifier mon retour');
+  $('feedback-delete').hidden=recent.clarity===null;
+}
+$('language').onchange=()=>{setLanguage($('language').value,document);error();render();};
+for(const key of ['feedback-clarity','feedback-quality'])for(let i=0;i<=10;i++){const option=node('option','',String(i));option.value=String(i);$(key).append(option);}
+$('feedback-call').onchange=()=>{feedbackChoice=$('feedback-call').value;renderFeedback();};
+$('feedback-button').onclick=()=>{
+  feedbackCall=selectedFeedbackCall();if(!feedbackCall)return;
+  $('feedback-form').reset();$('feedback-error').textContent='';
+  $('feedback-clarity').value=feedbackCall.clarity??'';$('feedback-quality').value=feedbackCall.quality??'';$('feedback-comment').value=feedbackCall.comment??'';
+  $('feedback-dialog').showModal();
+};
+$('feedback-form').onsubmit=async event=>{
+  event.preventDefault();if(!feedbackCall||!$('feedback-form').reportValidity())return;
+  $('feedback-submit').disabled=true;$('feedback-error').textContent='';
+  try{await api('feedback',{callId:feedbackCall.id,clarity:Number($('feedback-clarity').value),quality:Number($('feedback-quality').value),comment:$('feedback-comment').value,share:$('feedback-share').checked});await load();$('feedback-dialog').close();}
+  catch(e){$('feedback-error').textContent=e.message;}finally{$('feedback-submit').disabled=false;}
+};
+$('feedback-delete').onclick=()=>guard(async()=>{const recent=selectedFeedbackCall();if(recent&&await confirm(t('Retirer ce retour ?'),t('Il disparaîtra du tableau de l’équipe.'))){await api(`feedback/${recent.id}`,undefined,'DELETE');await load();}});
+$('transcript-form').onsubmit=async event=>{
+  event.preventDefault();$('transcript-save').disabled=true;$('transcript-error').textContent='';
+  try{await api(`messages/${editingTranscript}`,{text:$('transcript-text').value},'PATCH');await load();$('transcript-dialog').close();}
+  catch(e){$('transcript-error').textContent=e.message;}finally{$('transcript-save').disabled=false;}
+};
+
 async function init(){
   updateControls();
-  try{const status=await api('status');$('config-hint').textContent=status.ready?'':'Le service doit encore recevoir sa clé OpenAI et son code d’accès.';}catch{error('Le serveur n’est pas accessible.');}
+  try{const status=await api('status');$('config-hint').textContent=status.ready?'':t('Le service doit encore recevoir sa clé OpenAI et son code d’accès.');}catch{error(t('Le serveur n’est pas accessible.'));}
   try{await load();}catch(e){if(e.status!==401)error(e.message);render();}
   initialized=true;updateControls();
 }

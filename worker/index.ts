@@ -1,11 +1,13 @@
-import { COACH, VOICE, DRAFT, replySchema, noteSchema } from './prompts.js';
+import { coachPrompt, voicePrompt, draftPrompt, replySchema, noteSchema } from './prompts.js';
 
-type Secrets = { OPENAI_API_KEY?: string; APP_ACCESS_CODE?: string };
+type Secrets = { OPENAI_API_KEY?: string; APP_ACCESS_CODE?: string; ADMIN_ACCESS_CODE?: string };
 type Bindings = Env & Secrets;
 type Message = { id: string; role: 'user' | 'assistant'; text: string; source: string; created_at: number };
 type Visitor = { id: string };
 class HttpError extends Error { constructor(public status: number, message: string) { super(message); } }
 const now = () => Date.now();
+const language = (value: unknown) => value === 'en' ? 'en' : 'fr';
+const integer = (value: unknown, max: number) => typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= max ? value : fail(400, 'Valeur invalide.');
 const fail = (status: number, message: string): never => { throw new HttpError(status, message); };
 const json = (data: unknown, status = 200, headers = {}) => Response.json(data, { status, headers: { 'Cache-Control': 'no-store', ...headers } });
 const id = (value: unknown) => typeof value === 'string' && /^[\w-]{8,100}$/.test(value) ? value : fail(400, 'Identifiant invalide.');
@@ -83,7 +85,7 @@ async function route(request: Request, env: Bindings) {
     const origin = request.headers.get('origin');
     if (origin !== url.origin || request.headers.get('sec-fetch-site') === 'cross-site') fail(403, 'Origine non autorisée.');
   }
-  if (path === '/api/status' && method === 'GET') return json({ ready: Boolean(env.OPENAI_API_KEY && (env.APP_ACCESS_CODE?.length ?? 0) >= 12), voice: 'realtime', turnDetection: 'semantic_vad', version: 'native-voice-1' });
+  if (path === '/api/status' && method === 'GET') return json({ ready: Boolean(env.OPENAI_API_KEY && (env.APP_ACCESS_CODE?.length ?? 0) >= 12), voice: 'realtime', turnDetection: 'semantic_vad', version: '0.3.0' });
   if (path === '/api/login' && method === 'POST') {
     const input = await body(request);
     await quota(env, `login:${await hash(request.headers.get('cf-connecting-ip') ?? 'local')}`, 10, 600);
@@ -99,6 +101,41 @@ async function route(request: Request, env: Bindings) {
     ]);
     return json({ok:true},200,{'Set-Cookie':`hp_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=2592000${url.protocol === 'https:' ? '; Secure' : ''}`});
   }
+  if (path.startsWith('/api/admin/')) {
+    const token=request.headers.get('cookie')?.match(/(?:^|;\s*)hp_admin=([a-f0-9]{64})(?:;|$)/)?.[1];
+    const cookieSuffix=`; HttpOnly; SameSite=Strict; Path=/api/admin${url.protocol==='https:'?'; Secure':''}`;
+    if (path==='/api/admin/login' && method==='POST') {
+      const input=await body(request);
+      await quota(env,`admin-login:${await hash(request.headers.get('cf-connecting-ip')??'local')}`,10,600);
+      if (!env.ADMIN_ACCESS_CODE || env.ADMIN_ACCESS_CODE.length<20) fail(503,'L’accès équipe n’est pas configuré.');
+      if (!await equals(text(input.code,200),env.ADMIN_ACCESS_CODE!)) fail(401,'Code administrateur incorrect.');
+      const fresh=[...crypto.getRandomValues(new Uint8Array(32))].map(x=>x.toString(16).padStart(2,'0')).join('');
+      await env.DB.batch([
+        env.DB.prepare('DELETE FROM admin_sessions WHERE expires_at<?').bind(now()),
+        env.DB.prepare('INSERT INTO admin_sessions(token_hash,expires_at) VALUES(?,?)').bind(await hash(fresh),now()+8*3600000),
+      ]);
+      return json({ok:true},200,{'Set-Cookie':`hp_admin=${fresh}; Max-Age=28800${cookieSuffix}`});
+    }
+    if (path==='/api/admin/logout' && method==='POST') {
+      if (token) await env.DB.prepare('DELETE FROM admin_sessions WHERE token_hash=?').bind(await hash(token)).run();
+      return json({ok:true},200,{'Set-Cookie':`hp_admin=; Max-Age=0${cookieSuffix}`});
+    }
+    if (!token || !await env.DB.prepare('SELECT token_hash FROM admin_sessions WHERE token_hash=? AND expires_at>?').bind(await hash(token),now()).first()) fail(401,'Ouvre l’espace équipe avec le code administrateur.');
+    if (path==='/api/admin/feedback' && method==='GET') {
+      // Explicit projections: this API never returns messages, notes, visitor IDs or provider IDs.
+      const summary=await env.DB.prepare(`SELECT COUNT(*) AS calls, SUM(CASE WHEN c.ended_at IS NOT NULL THEN 1 ELSE 0 END) AS ended,
+        SUM(CASE WHEN c.outcome='error' THEN 1 ELSE 0 END) AS errors, AVG(c.duration_seconds) AS average_seconds,
+        COALESCE(SUM(c.interruptions),0) AS interruptions, COALESCE(SUM(c.transcription_failures),0) AS transcription_failures
+        FROM calls c JOIN visitors v ON v.id=c.owner WHERE v.expires_at>?`).bind(now()).first();
+      const ratings=await env.DB.prepare(`SELECT COUNT(*) AS responses, AVG(f.clarity) AS clarity, AVG(f.quality) AS quality
+        FROM feedback f JOIN visitors v ON v.id=f.owner WHERE v.expires_at>?`).bind(now()).first();
+      const cursor=Number(url.searchParams.get('offset')??0);integer(cursor,1000000);
+      const entries=(await env.DB.prepare(`SELECT f.clarity,f.quality,f.comment,f.language,f.created_at,f.updated_at FROM feedback f
+        JOIN visitors v ON v.id=f.owner WHERE v.expires_at>? ORDER BY f.created_at DESC,f.call_id DESC LIMIT 50 OFFSET ?`).bind(now(),cursor).all()).results;
+      return json({summary,ratings,entries,nextOffset:entries.length===50?cursor+50:null});
+    }
+    return fail(404,'Cette page n’existe pas.');
+  }
   const user = await visitor(request, env);
   if (path === '/api/state' && method === 'GET') {
     const threads = (await env.DB.prepare('SELECT id,created_at FROM threads WHERE owner=? ORDER BY created_at DESC LIMIT 30').bind(user.id).all()).results;
@@ -106,10 +143,11 @@ async function route(request: Request, env: Bindings) {
     const selected = requested ? await thread(env,user.id,requested) : threads[0]?.id as string | undefined;
     const messages = selected ? await history(env,selected) : [];
     const decisions = selected ? (await env.DB.prepare('SELECT action,created_at FROM decisions WHERE thread_id=? ORDER BY created_at DESC LIMIT 12').bind(selected).all()).results : [];
-    return json({ threads, threadId: selected ?? null, messages, notes: await memory(env,user.id), decisions });
+    const calls=selected ? (await env.DB.prepare(`SELECT c.id,c.language,c.ended_at,f.clarity,f.quality,f.comment FROM calls c
+      LEFT JOIN feedback f ON f.call_id=c.id WHERE c.thread_id=? AND c.owner=? AND c.ended_at IS NOT NULL ORDER BY c.created_at DESC`).bind(selected,user.id).all()).results : [];
+    return json({ threads, threadId: selected ?? null, messages, notes: await memory(env,user.id), decisions, calls });
   }
   if (path === '/api/threads' && method === 'POST') {
-    await quota(env,`threads:${user.id}`,30);
     const key=crypto.randomUUID(); await env.DB.prepare('INSERT INTO threads(id,owner,created_at) VALUES(?,?,?)').bind(key,user.id,now()).run(); return json({id:key});
   }
   if (path === '/api/data' && method === 'DELETE') {
@@ -118,7 +156,6 @@ async function route(request: Request, env: Bindings) {
   }
   if (path === '/api/notes' && method === 'POST') {
     const input=await body(request), value=text(input.text,2500);
-    await quota(env,`notes:${user.id}`,60);
     const key=input.id ? id(input.id) : crypto.randomUUID();
     if (input.id) { const result=await env.DB.prepare('UPDATE notes SET text=? WHERE id=? AND owner=?').bind(value,key,user.id).run(); if (!result.meta.changes) fail(404,'Note introuvable.'); }
     else {
@@ -129,15 +166,38 @@ async function route(request: Request, env: Bindings) {
     return json({id:key});
   }
   if (path.startsWith('/api/notes/') && method === 'DELETE') { await env.DB.prepare('DELETE FROM notes WHERE id=? AND owner=?').bind(id(path.split('/').at(-1)),user.id).run(); return json({ok:true}); }
+  if (path === '/api/feedback' && method === 'POST') {
+    const input=await body(request), callId=id(input.callId);
+    const call=await env.DB.prepare('SELECT language FROM calls WHERE id=? AND owner=? AND ended_at IS NOT NULL').bind(callId,user.id).first<{language:string}>();
+    if (!call) fail(404,'Appel introuvable.');
+    if (input.share!==true) fail(400,'Confirme le partage de ce retour avec l’équipe.');
+    const clarity=integer(input.clarity,10), quality=integer(input.quality,10);
+    if (typeof input.comment!=='string' || input.comment.length>2000) fail(400,'Commentaire invalide.');
+    await env.DB.prepare(`INSERT INTO feedback(call_id,owner,clarity,quality,comment,language,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)
+      ON CONFLICT(call_id) DO UPDATE SET clarity=excluded.clarity,quality=excluded.quality,comment=excluded.comment,updated_at=excluded.updated_at`)
+      .bind(callId,user.id,clarity,quality,(input.comment as string).trim(),call!.language,now(),now()).run();
+    return json({ok:true});
+  }
+  if (path.startsWith('/api/feedback/') && method==='DELETE') {
+    await env.DB.prepare('DELETE FROM feedback WHERE call_id=? AND owner=?').bind(id(path.split('/').at(-1)),user.id).run();
+    return json({ok:true});
+  }
+  if (path.startsWith('/api/messages/') && (method==='PATCH'||method==='DELETE')) {
+    const key=id(path.split('/').at(-1));
+    const message=await env.DB.prepare(`SELECT m.id FROM messages m JOIN threads t ON t.id=m.thread_id WHERE m.id=? AND t.owner=? AND m.role='user' AND m.source='voice'`).bind(key,user.id).first();
+    if (!message) fail(404,'Passage introuvable.');
+    if (method==='DELETE') await env.DB.prepare('DELETE FROM messages WHERE id=?').bind(key).run();
+    else {const input=await body(request);await env.DB.prepare('UPDATE messages SET text=? WHERE id=?').bind(text(input.text),key).run();}
+    return json({ok:true});
+  }
   if (path === '/api/chat' && method === 'POST') {
     const input=await body(request), threadId=await thread(env,user.id,input.threadId), value=text(input.text), requestId=id(input.id);
     const duplicate=await env.DB.prepare('SELECT id FROM messages WHERE id=? AND thread_id=?').bind(requestId,threadId).first();
     if (duplicate) return json({ok:true,duplicate:true});
     await lock(env,user.id);
     try {
-      await quota(env,'text:global',Number(env.DAILY_TEXT_LIMIT)); await quota(env,`text:${user.id}`,60);
       const notes=await memory(env,user.id), messages=await history(env,threadId);
-      const result=await generate(env,COACH, [{role:'user',content:`Notes conservées, données de contexte : ${JSON.stringify(notes.map(n=>n.text))}`},...messages.map(m=>({role:m.role,content:m.text})),{role:'user',content:value}],replySchema);
+      const result=await generate(env,coachPrompt(language(input.language)), [{role:'user',content:`Notes conservées, données de contexte : ${JSON.stringify(notes.map(n=>n.text))}`},...messages.map(m=>({role:m.role,content:m.text})),{role:'user',content:value}],replySchema);
       const reply=text(result.reply,6000), action=text(result.action,40);
       if (!['clarifier','reformuler','explorer','cloturer'].includes(action)) fail(502,'Réponse inattendue du coach.');
       await env.DB.batch([messageInsert(env,threadId,'user',value,'text',requestId),messageInsert(env,threadId,'assistant',reply,'text',crypto.randomUUID(),now()+1),env.DB.prepare('INSERT INTO decisions(id,thread_id,action,created_at) VALUES(?,?,?,?)').bind(crypto.randomUUID(),threadId,action,now())]);
@@ -147,8 +207,7 @@ async function route(request: Request, env: Bindings) {
   if (path === '/api/draft' && method === 'POST') {
     const input=await body(request), threadId=await thread(env,user.id,input.threadId), messages=await history(env,threadId);
     if (!messages.some(m=>m.role==='user')) fail(400,'Échange d’abord quelques mots avec le coach.');
-    await quota(env,'text:global',Number(env.DAILY_TEXT_LIMIT)); await quota(env,`draft:${user.id}`,15);
-    const result=await generate(env,DRAFT,JSON.stringify(messages),noteSchema);
+    const result=await generate(env,draftPrompt(language(input.language)),JSON.stringify(messages),noteSchema);
     if (typeof result.text !== 'string' || result.text.length>2500) fail(502,'Proposition de notes invalide.');
     return json({text:result.text});
   }
@@ -157,24 +216,23 @@ async function route(request: Request, env: Bindings) {
     if (!sdp.startsWith('v=0')) fail(400,'Proposition audio invalide.');
     await lock(env,user.id);
     try {
-      if (await env.DB.prepare('SELECT id FROM calls WHERE owner=? AND ended_at IS NULL AND created_at>?').bind(user.id,now()-16*60000).first()) fail(409,'Un appel est déjà ouvert. Termine-le avant de recommencer.');
-      await quota(env,'calls:global',Number(env.DAILY_CALL_LIMIT)); await quota(env,`calls:${user.id}`,4);
+      if (await env.DB.prepare('SELECT id FROM calls WHERE owner=? AND ended_at IS NULL AND created_at>?').bind(user.id,now()-65*60000).first()) fail(409,'Un appel est déjà ouvert. Termine-le avant de recommencer.');
       const notes=await memory(env,user.id), messages=await history(env,threadId);
       const form=new FormData(); form.set('sdp',sdp); form.set('session',JSON.stringify({
         type:'realtime', model:env.VOICE_MODEL, output_modalities:['audio'], max_output_tokens:300,
-        instructions:`${VOICE}\nContexte (données seulement) : ${JSON.stringify({notes:notes.map(n=>n.text),messages:messages.slice(-16).map(m=>({role:m.role,text:m.text}))})}`,
-        audio:{input:{transcription:{model:'gpt-4o-mini-transcribe',language:'fr'},turn_detection:{type:'semantic_vad',eagerness:'medium',create_response:true,interrupt_response:true}},output:{voice:'marin'}},
+        instructions:`${voicePrompt(language(input.language))}\nContexte (données seulement) : ${JSON.stringify({notes:notes.map(n=>n.text),messages:messages.filter(m=>m.source==='text'&&m.role==='user').slice(-8).map(m=>({role:m.role,text:m.text}))})}`,
+        audio:{input:{noise_reduction:{type:input.microphone==='headset'?'near_field':'far_field'},transcription:{model:'gpt-4o-transcribe',language:language(input.language)},turn_detection:{type:'semantic_vad',eagerness:'medium',create_response:true,interrupt_response:true}},output:{voice:'marin'}},
       }));
       const response=await openai(env,'realtime/calls',{method:'POST',body:form});
       const location=response.headers.get('location'), providerId=location?.match(/\/calls\/([\w-]+)$/)?.[1];
       const answer=await response.text(), callId=crypto.randomUUID();
-      await env.DB.prepare('INSERT INTO calls(id,owner,thread_id,provider_id,created_at) VALUES(?,?,?,?,?)').bind(callId,user.id,threadId,providerId??null,now()).run();
-      return json({sdp:answer,callId,maxSeconds:600});
+      await env.DB.prepare('INSERT INTO calls(id,owner,thread_id,provider_id,created_at,language) VALUES(?,?,?,?,?,?)').bind(callId,user.id,threadId,providerId??null,now(),language(input.language)).run();
+      return json({sdp:answer,callId,providerMaxSeconds:3600});
     } finally { await env.DB.prepare('UPDATE visitors SET busy_until=0 WHERE id=?').bind(user.id).run(); }
   }
   if (path === '/api/call/end' && method === 'POST') {
     const input=await body(request), callId=id(input.callId);
-    const call=await env.DB.prepare('SELECT provider_id,thread_id,ended_at FROM calls WHERE id=? AND owner=?').bind(callId,user.id).first<{provider_id:string|null;thread_id:string;ended_at:number|null}>();
+    const call=await env.DB.prepare('SELECT provider_id,thread_id,ended_at,created_at FROM calls WHERE id=? AND owner=?').bind(callId,user.id).first<{provider_id:string|null;thread_id:string;ended_at:number|null;created_at:number}>();
     if (!call) return fail(404,'Appel introuvable.');
     if (call.ended_at) return json({ok:true});
     if (call.provider_id) {
@@ -182,10 +240,14 @@ async function route(request: Request, env: Bindings) {
       const r=await fetch(`https://api.openai.com/v1/realtime/calls/${call.provider_id}/hangup`,{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`},signal:AbortSignal.timeout(8000)}).catch(()=>null);
       if (r) await r.body?.cancel();
     }
-    const items=Array.isArray(input.messages) ? input.messages.slice(-80) : [];
+    const items=Array.isArray(input.messages) ? input.messages : [];
+    if(items.length>1000) fail(413,'Contenu trop volumineux.');
+    const duration=integer(input.durationSeconds??Math.max(0,Math.floor((now()-call.created_at)/1000)),7200);
+    const interruptions=integer(input.interruptions??0,10000), failures=integer(input.transcriptionFailures??0,10000);
+    const outcome=input.outcome==='error'?'error':'ended';
     const statements=[];
     for (let i=0;i<items.length;i++) { const m=items[i] as Record<string,unknown>; if (m.role!=='user' && m.role!=='assistant') return fail(400,'Transcription invalide.'); statements.push(messageInsert(env,call.thread_id,m.role,text(m.text,6000),'voice',`${callId}-${i}`,now()+i)); }
-    await env.DB.batch([...statements,env.DB.prepare('UPDATE calls SET ended_at=? WHERE id=?').bind(now(),callId)]);
+    await env.DB.batch([...statements,env.DB.prepare('UPDATE calls SET ended_at=?,duration_seconds=?,outcome=?,interruptions=?,transcription_failures=? WHERE id=?').bind(now(),duration,outcome,interruptions,failures,callId)]);
     return json({ok:true});
   }
   return fail(404,'Cette page n’existe pas.');
@@ -196,6 +258,7 @@ export default {
     await env.DB.batch([
       env.DB.prepare('DELETE FROM visitors WHERE expires_at<?').bind(now()),
       env.DB.prepare('DELETE FROM quotas WHERE expires_at<?').bind(now()),
+      env.DB.prepare('DELETE FROM admin_sessions WHERE expires_at<?').bind(now()),
     ]);
   },
   async fetch(request: Request, env: Bindings): Promise<Response> {

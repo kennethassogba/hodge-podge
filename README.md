@@ -25,13 +25,14 @@ Prérequis : Node.js 22 ou supérieur, npm, une clé API OpenAI disposant de cr�
 ```sh
 npm ci
 cp .dev.vars.example .dev.vars
-# Renseigner OPENAI_API_KEY et un APP_ACCESS_CODE d’au moins 12 caractères.
+# Renseigner OPENAI_API_KEY, APP_ACCESS_CODE (12 caractères minimum)
+# et ADMIN_ACCESS_CODE distinct (20 caractères minimum) pour le tableau équipe.
 npm run types
 npm run db:local
 npm run dev
 ```
 
-Ouvrir http://127.0.0.1:8787. Les modèles configurés dans `wrangler.jsonc` sont `gpt-4.1-mini` pour le texte et les notes, `gpt-realtime-2.1` pour la voix et `gpt-4o-mini-transcribe` pour la transcription. L’accès à ces modèles a été vérifié avec le compte de l’équipe.
+Ouvrir http://127.0.0.1:8787. Les modèles configurés dans `wrangler.jsonc` sont `gpt-4.1-mini` pour le texte et les notes, `gpt-realtime-2.1` pour la voix et `gpt-4o-transcribe` pour la transcription. L’accès à ces modèles a été vérifié avec le compte de l’équipe.
 
 ```sh
 npm run check
@@ -45,6 +46,7 @@ Un test audio réseau optionnel rejoue trois questions avec deux réponses synth
 
 ```sh
 python scripts/check-voice.py http://127.0.0.1:8787
+python scripts/check-voice.py http://127.0.0.1:8787 en
 # Ou passer l’URL du déploiement à vérifier.
 ```
 
@@ -77,15 +79,27 @@ Pour un autre compte, créer d’abord une base avec `npx wrangler d1 create hod
 
 Messages et appel WebRTC OpenAI, silences automatiques, reprise après interruption, historique, notes modifiables et supprimables, mémoire entre séances, effacement de l’espace et code d’accès. Le modèle texte choisit entre clarifier, reformuler, explorer et clôturer ; son choix est visible dans le volet technique. Un second appel au modèle prépare une note, dont la sauvegarde exige une action de la personne.
 
-L’agent vocal reçoit le fil récent et les notes approuvées. Realtime gère directement les tours de parole et les interruptions avec `semantic_vad`. Les 14 questions du PDF sont dans les instructions du modèle, qui doit les suivre dans l’ordre et mot pour mot, sauf demande explicite de répétition, explication, temps ou arrêt. Le logiciel ne prétend ni lire un agenda ni envoyer un rappel. Notion, Telegram et les autres fournisseurs sont hors de cette version.
+L’agent vocal reçoit le fil récent et les notes approuvées. Realtime gère directement les tours de parole et les interruptions avec `semantic_vad`. Les 14 questions du PDF sont dans les instructions du modèle, qui doit les suivre dans l’ordre et mot pour mot, sauf demande explicite de répétition, explication, temps, passage de question, arrêt ou envie de passer à l’action. Le logiciel ne prétend ni lire un agenda ni envoyer un rappel. Notion, Telegram et les autres fournisseurs sont hors de cette version.
+
+## Version 0.3.0 : essais en français et anglais
+
+- Choix FR/EN avant l’appel : interface, protocole, voix, transcription et brouillons de notes. Les notes et échanges existants ne sont pas traduits automatiquement. L’adaptation anglaise est dans `public/coaching-protocol.js` et reste à relire avec Séb.
+- Filtrage OpenAI `far_field` pour micro intégré et `near_field` pour casque, en complément des traitements du navigateur. Une consigne privilégie le français de France et évite de répondre aux conversations lointaines. Cela ne garantit pas une immunité au bruit ni un accent parfait.
+- Après l’appel, retour facultatif : clarté gagnée et qualité ressentie de 0 à 10, commentaire optionnel, case de partage non cochée. Modifier ou retirer un retour depuis la séance ; aucun questionnaire oral ajouté au coaching.
+- Les passages de transcription utilisateur sont corrigeables et supprimables avant préparation des notes. Les notes déjà approuvées restent à modifier séparément.
+- Tableau `/team.html`, code administrateur distinct, cookie HttpOnly de huit heures et déconnexion. Il affiche uniquement les avis explicitement partagés et des statistiques techniques agrégées : appels, fins enregistrées, durée, erreurs, interruptions détectées, échecs de transcription. Il n’expose pas les conversations ou notes. Les administrateurs de l’hébergement gardent un accès technique à la base.
+- Retours et métriques sont supprimés avec l’espace et expirent avec lui ; les chiffres du tableau peuvent donc diminuer. Une interruption n’est pas forcément un bug, et un avis n’est pas une mesure causale d’impact.
+
+Le code administrateur de cette installation est dans `.dev.vars.admin`, ignoré par Git. Pour une autre installation, définir `ADMIN_ACCESS_CODE` dans `.dev.vars` puis dans les secrets Cloudflare. Voir [le guide des essais](docs/essais.md).
 
 ## Données et limites
 
 - Le fil écrit et les transcriptions restent dans D1. L’application ne stocke pas les fichiers audio. Texte et audio sont transmis à OpenAI pour traitement.
 - Un espace est lié à un cookie de navigateur et expire après 30 jours ; une purge quotidienne supprime ensuite ses données. Perdre le cookie fait perdre l’accès : pas de compte ni de synchronisation entre appareils.
-- Seules les notes validées passent automatiquement d’une séance à l’autre. Dans une séance, le modèle reçoit au plus les 40 derniers messages ; la voix reçoit les 16 derniers. Maximum 20 notes.
+- Seules les notes validées passent automatiquement d’une séance à l’autre. Dans une séance, le modèle reçoit au plus les 40 derniers messages ; la voix reçoit au plus les huit derniers messages écrits par la personne, sans anciennes questions de coaching. Maximum 20 notes.
 - Les transcriptions d’appel sont sauvegardées à la fin. En cas d’échec, laisser la page ouverte pour réessayer. Fermer brutalement peut perdre la transcription.
-- Limites serveur : 150 demandes texte/notes et 12 ouvertures d’appel par jour au total ; 60 messages et 4 appels par espace. Les essais échoués peuvent compter. Le minuteur vocal est côté navigateur : ces limites ne constituent pas un plafond financier garanti.
+- Aucun quota applicatif de messages, notes proposées ou appels et aucune coupure à dix minutes. OpenAI limite une session Realtime à 60 minutes ; ses limites de débit/crédit et les capacités Cloudflare continuent de s’appliquer. Les tentatives de connexion restent limitées contre le bruteforce. Un seul appel simultané par espace.
+- Effacer l’espace supprime la base active, pas instantanément les journaux des fournisseurs. OpenAI : pas d’entraînement par défaut sauf partage volontaire ; journaux de surveillance des abus jusqu’à 30 jours avec exceptions. `store: false` pour les réponses texte ne signifie pas Zero Data Retention. D1 Time Travel : 7 jours en Free, 30 en Paid. Ces règles sont expliquées dans l’interface et dans [le guide des essais](docs/essais.md).
 - Le code partagé protège un petit essai d’équipe ; ce prototype n’a pas une authentification de produit public. Ne pas publier ce code d’accès.
 
 ## Dossier d’équipe

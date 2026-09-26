@@ -4,7 +4,8 @@ from aiortc import RTCPeerConnection,RTCSessionDescription,AudioStreamTrack
 ROOT=pathlib.Path(__file__).resolve().parent.parent
 NODE=shutil.which('node')
 assert NODE, 'Node.js must be available on PATH'
-protocol=json.loads(subprocess.check_output([NODE,'--input-type=module','-e',"import {QUESTIONS} from './public/coaching-protocol.js';console.log(JSON.stringify(QUESTIONS.slice(0,3)));"],cwd=ROOT))
+LANGUAGE=sys.argv[2] if len(sys.argv)>2 and sys.argv[2]=='en' else 'fr'
+protocol=json.loads(subprocess.check_output([NODE,'--input-type=module','-e',"import {QUESTIONS,QUESTIONS_EN} from './public/coaching-protocol.js';console.log(JSON.stringify({fr:QUESTIONS.slice(0,3),en:QUESTIONS_EN.slice(0,3)}));"],cwd=ROOT))[LANGUAGE]
 class Speech(AudioStreamTrack):
     def __init__(self):super().__init__();self.pts=0;self.start=None;self.buffer=b''
     async def recv(self):
@@ -16,10 +17,10 @@ class Speech(AudioStreamTrack):
 def norm(s):return re.sub('[^a-z0-9]+',' ',''.join(c for c in unicodedata.normalize('NFD',s.lower()) if not unicodedata.combining(c))).strip()
 async def main():
     values=dict(l.split('=',1) for l in (ROOT/'.dev.vars').read_text().splitlines() if '=' in l and not l.startswith('#'));key=values['OPENAI_API_KEY'].strip().strip('"');base=sys.argv[1] if len(sys.argv)>1 else 'http://127.0.0.1:8787'
-    audio_file=pathlib.Path(tempfile.gettempdir())/'hodge-podge-synthetic-test-reply.wav'
+    audio_file=pathlib.Path(tempfile.gettempdir())/('hodge-podge-synthetic-test-reply'+('-en' if LANGUAGE=='en' else '')+'.wav')
     async with aiohttp.ClientSession(cookie_jar=aiohttp.CookieJar(unsafe=True),headers={'Origin':base}) as session:
         if not audio_file.exists():
-            async with session.post('https://api.openai.com/v1/audio/speech',headers={'Authorization':'Bearer '+key},json={'model':'gpt-4o-mini-tts','voice':'alloy','input':'Je réfléchis à la façon de parler à mon équipe. Je voudrais leur laisser plus de place.','response_format':'wav'}) as r:
+            async with session.post('https://api.openai.com/v1/audio/speech',headers={'Authorization':'Bearer '+key},json={'model':'gpt-4o-mini-tts','voice':'alloy','input':('I am thinking about how to talk to my team. I would like to give them more room to share their ideas.' if LANGUAGE=='en' else 'Je réfléchis à la façon de parler à mon équipe. Je voudrais leur laisser plus de place.'),'response_format':'wav'}) as r:
                 assert r.status==200, 'TTS failed: '+str(r.status);audio_file.write_bytes(await r.read())
         resampler=av.AudioResampler(format='s16',layout='mono',rate=48000);parts=[]
         with av.open(str(audio_file)) as source:
@@ -60,7 +61,7 @@ async def main():
             asyncio.create_task(consume())
         call=None
         try:
-            await peer.setLocalDescription(await peer.createOffer());call=await post('call',{'threadId':thread['id'],'sdp':peer.localDescription.sdp});await peer.setRemoteDescription(RTCSessionDescription(call['sdp'],'answer'))
+            await peer.setLocalDescription(await peer.createOffer());call=await post('call',{'threadId':thread['id'],'sdp':peer.localDescription.sdp,'language':LANGUAGE});await peer.setRemoteDescription(RTCSessionDescription(call['sdp'],'answer'))
             await asyncio.wait_for(done.wait(),100);assert len(spoken)==3,(len(spoken),failure);assert not failure,failure;assert len(requested)==1;print('PASS: three exact protocol questions, two real audio answers, native automatic turns.',flush=True)
         finally:
             for t in timers:t.cancel()

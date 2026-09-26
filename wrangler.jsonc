@@ -11,9 +11,7 @@
   "triggers": { "crons": ["0 3 * * *"] },
   "vars": {
     "TEXT_MODEL": "gpt-4.1-mini",
-    "VOICE_MODEL": "gpt-realtime-2.1",
-    "DAILY_TEXT_LIMIT": "150",
-    "DAILY_CALL_LIMIT": "12"
+    "VOICE_MODEL": "gpt-realtime-2.1"
   },
   "observability": { "enabled": true, "head_sampling_rate": 0.1 }
 }

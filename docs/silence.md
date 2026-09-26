@@ -12,7 +12,7 @@ Ce réglage ne garantit pas une pause précise de cinq secondes. La priorité de
 
 ## Script
 
-Les 14 questions originales, attribuées à Kedo Academy by Tirezio, sont dans `public/coaching-protocol.js` et les instructions serveur. Le modèle doit les suivre dans l’ordre, mot pour mot, avec une brève adaptation seulement si la personne demande une explication, une répétition, du temps ou l’arrêt. Le client ne bloque plus la conversation sur une comparaison de transcription.
+Les 14 questions originales, attribuées à Kedo Academy by Tirezio, sont dans `public/coaching-protocol.js` et les instructions serveur. Le modèle doit les suivre dans l’ordre, mot pour mot, avec des exceptions explicites pour expliquer, répéter, laisser du temps, passer une question ou arrêter, notamment pour passer à l’action sans débrief. Le client ne bloque plus la conversation sur une comparaison de transcription.
 
 ## Vérification
 

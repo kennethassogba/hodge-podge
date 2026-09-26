@@ -34,9 +34,9 @@ const server=createServer(async(req,res)=>{
   if(url.pathname==='/__test__/fixture.js'){res.writeHead(200,{'Content-Type':'text/javascript'});res.end(fixture);return;}
   if(url.pathname==='/__test__/reply.wav'){res.writeHead(200,{'Content-Type':'audio/wav'});res.end(await readFile(resolve(tmpdir(),'hodge-podge-synthetic-test-reply.wav')));return;}
   if(url.pathname==='/'||url.pathname==='/index.html'){
-    let html=await readFile(root+'/public/index.html','utf8');html=html.replace('<script type="module" src="/app.js?v=0.2.0"></script>','<script type="module" src="/__test__/fixture.js"></script><script type="module" src="/app.js"></script>');res.writeHead(200,{'Content-Type':'text/html','Cache-Control':'no-store'});res.end(html);return;
+    let html=await readFile(root+'/public/index.html','utf8');html=html.replace(/<script type="module" src="\/app\.js[^"]*"><\/script>/,'<script type="module" src="/__test__/fixture.js"></script><script type="module" src="/app.js"></script>');res.writeHead(200,{'Content-Type':'text/html','Cache-Control':'no-store'});res.end(html);return;
   }
   const p=resolve(root+'/public','.'+url.pathname);if(!p.startsWith(root+'/public/'))throw Error('Forbidden');
-  const type=p.endsWith('.js')?'text/javascript':p.endsWith('.css')?'text/css':p.endsWith('.woff2')?'font/woff2':'image/svg+xml';res.writeHead(200,{'Content-Type':type,'Cache-Control':'no-store'});res.end(await readFile(p));
+  const type=p.endsWith('.js')?'text/javascript':p.endsWith('.css')?'text/css':p.endsWith('.woff2')?'font/woff2':p.endsWith('.html')?'text/html':'image/svg+xml';res.writeHead(200,{'Content-Type':type,'Cache-Control':'no-store'});res.end(await readFile(p));
  }catch{res.writeHead(500);res.end('Test fixture error');}
 });server.listen(8790,'127.0.0.1',()=>console.log('Browser voice fixture on http://127.0.0.1:8790; upstream '+upstream));

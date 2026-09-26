@@ -13,7 +13,7 @@ async function request(path,{data,method=data?'POST':'GET',cookie=cookieA,custom
 before(async()=>{
   const result=await build({entryPoints:['worker/index.ts'],bundle:true,write:false,format:'esm',platform:'browser'});
   mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:result.outputFiles[0].text,compatibilityDate:'2026-09-26',d1Databases:['DB'],
-    bindings:{OPENAI_API_KEY:'test-only-not-real',APP_ACCESS_CODE:'integration-test-access',TEXT_MODEL:'test',VOICE_MODEL:'test',DAILY_TEXT_LIMIT:'150',DAILY_CALL_LIMIT:'12'},
+    bindings:{OPENAI_API_KEY:'test-only-not-real',APP_ACCESS_CODE:'integration-test-access',ADMIN_ACCESS_CODE:'test-only-admin-code-distinct',TEXT_MODEL:'test',VOICE_MODEL:'test',DAILY_TEXT_LIMIT:'150',DAILY_CALL_LIMIT:'12'},
     serviceBindings:{ASSETS:()=>new Response('asset')},
     outboundService:async req=>{
       if(req.url.endsWith('/hangup'))return new Response(null,{status:200});
@@ -28,7 +28,7 @@ before(async()=>{
       const result=draft?{text:'Je souhaite réfléchir avant de répondre.'}:latest.includes('pas d’action')?{reply:'D’accord. Avec quoi repars-tu de cet échange ?',action:'cloturer'}:{reply:'Qu’aimerais-tu éclaircir en premier ?',action:'clarifier'};
       return Response.json({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify(result)}]}]});
     }}));
-  const db=await mf.getD1Database('DB');const sql=await readFile('migrations/0001_initial.sql','utf8');
+  const db=await mf.getD1Database('DB');const sql=(await Promise.all(['0001_initial.sql','0002_feedback.sql'].map(f=>readFile('migrations/'+f,'utf8')))).join('\n');
   for(const statement of sql.split(';').filter(x=>x.trim()))await db.prepare(statement).run();
 });
 after(async()=>{await mf?.dispose();});
@@ -71,9 +71,53 @@ test('voice session uses native automatic turn-taking and closes only for its ow
   assert.equal((await request('call/end',{data:ending})).status,200);
   const saved=(await request('state?thread='+threadA)).data.messages.filter(x=>x.source==='voice');assert.equal(saved.length,1);
 });
+test('English prompts, transcription language, noise reduction and unrestricted call count',async()=>{
+  for(let i=0;i<14;i++){
+    const r=await request('call',{data:{threadId:threadA,sdp:'v=0\r\n',language:'en',microphone:'headset'}});assert.equal(r.status,200);
+    assert.equal(r.data.maxSeconds,undefined);assert.equal(voiceConfig.audio.input.transcription.language,'en');
+    assert.equal(voiceConfig.audio.input.transcription.model,'gpt-4o-transcribe');
+    assert.equal(voiceConfig.audio.input.noise_reduction.type,'near_field');assert.match(voiceConfig.instructions,/Welcome to this bubble/);assert.doesNotMatch(voiceConfig.instructions,/Parle français/);
+    await request('call/end',{data:{callId:r.data.callId,messages:[],durationSeconds:900,interruptions:2,outcome:'ended'}});
+  }
+  await request('chat',{data:{threadId:threadA,id:crypto.randomUUID(),text:'Hello',language:'en'}});assert.match(lastInput.instructions,/Speak natural English/);
+  await request('draft',{data:{threadId:threadA,language:'en'}});assert.match(lastInput.instructions,/note in English/);
+});
+test('feedback requires consent, validates scores, is private and editable, and admin has only safe projections',async()=>{
+  const r=await request('call',{data:{threadId:threadA,sdp:'v=0\r\n'}});const callId=r.data.callId;
+  assert.equal(voiceConfig.audio.input.noise_reduction.type,'far_field');
+  const value={callId,clarity:0,quality:10,comment:'An explicit test comment',share:true};
+  assert.equal((await request('feedback',{data:value})).status,404);
+  await request('call/end',{data:{callId,messages:[{role:'user',text:'Private sentence, must never be visible to the team.'}],outcome:'error',durationSeconds:65,transcriptionFailures:1}});
+  assert.equal((await request('feedback',{cookie:cookieB,data:value})).status,404);
+  assert.equal((await request('feedback',{data:{...value,share:false}})).status,400);
+  assert.equal((await request('feedback',{data:{...value,clarity:11}})).status,400);
+  assert.equal((await request('feedback',{data:{...value,clarity:1.5}})).status,400);
+  assert.equal((await request('feedback',{data:{...value,clarity:null}})).status,400);
+  assert.equal((await request('feedback',{data:value})).status,200);
+  assert.equal((await request('admin/feedback')).status,401);
+  assert.equal((await request('admin/login',{data:{code:'integration-test-access'}})).status,401);
+  const a=await request('admin/login',{data:{code:'test-only-admin-code-distinct'}});const admin=a.headers.get('set-cookie').split(';')[0];
+  assert.match(a.headers.get('set-cookie'),/HttpOnly/);assert.match(a.headers.get('set-cookie'),/Path=\/api\/admin/);
+  let dashboard=(await request('admin/feedback',{cookie:admin})).data;
+  assert.equal(dashboard.ratings.responses,1);assert.equal(dashboard.ratings.clarity,0);assert.equal(dashboard.summary.errors,1);
+  assert.equal(dashboard.entries[0].comment,value.comment);assert.doesNotMatch(JSON.stringify(dashboard),/Private sentence|owner|provider_id|thread_id|token_hash/);
+  await request('feedback',{data:{...value,clarity:8}});dashboard=(await request('admin/feedback',{cookie:admin})).data;
+  assert.equal(dashboard.ratings.responses,1);assert.equal(dashboard.ratings.clarity,8);
+  await request('feedback/'+callId,{cookie:cookieB,method:'DELETE'});assert.equal((await request('admin/feedback',{cookie:admin})).data.ratings.responses,1);
+  await request('feedback/'+callId,{method:'DELETE'});assert.equal((await request('admin/feedback',{cookie:admin})).data.ratings.responses,0);
+  await request('feedback',{data:value});
+  await request('admin/logout',{cookie:admin,data:{}});assert.equal((await request('admin/feedback',{cookie:admin})).status,401);
+  const saved=(await request('state?thread='+threadA)).data.messages.find(m=>m.text.startsWith('Private sentence'));
+  assert.equal((await request('messages/'+saved.id,{cookie:cookieB,method:'PATCH',data:{text:'Forbidden'}})).status,404);
+  assert.equal((await request('messages/'+saved.id,{method:'PATCH',data:{text:'Corrected by the speaker.'}})).status,200);
+  assert.equal((await request('state?thread='+threadA)).data.messages.find(m=>m.id===saved.id).text,'Corrected by the speaker.');
+  assert.equal((await request('messages/'+saved.id,{method:'DELETE'})).status,200);
+});
 test('notes can be corrected and removed; deletion removes personal data',async()=>{
   await request('notes',{data:{id:noteA,text:'Correction choisie.'}});assert.equal((await request('state')).data.notes[0].text,'Correction choisie.');
   await request('notes/'+noteA,{method:'DELETE'});assert.equal((await request('state')).data.notes.length,0);
   await request('data',{method:'DELETE'});assert.equal((await request('state')).status,401);
   const db=await mf.getD1Database('DB');assert.equal((await db.prepare('SELECT count(*) as n FROM messages').first()).n,0);
+  assert.equal((await db.prepare('SELECT count(*) as n FROM feedback').first()).n,0);
+  assert.equal((await db.prepare('SELECT count(*) as n FROM calls').first()).n,0);
 });
