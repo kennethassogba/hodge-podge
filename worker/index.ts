@@ -1,3 +1,5 @@
+import { notionRoute } from './notion';
+import { tickNotion } from './notion-agents';
 import { coachPrompt, voicePrompt, draftPrompt, replySchema, noteSchema } from './prompts.js';
 
 type Secrets = { OPENAI_API_KEY?: string; APP_ACCESS_CODE?: string; ADMIN_ACCESS_CODE?: string };
@@ -85,7 +87,7 @@ async function route(request: Request, env: Bindings) {
     const origin = request.headers.get('origin');
     if (origin !== url.origin || request.headers.get('sec-fetch-site') === 'cross-site') fail(403, 'Origine non autorisée.');
   }
-  if (path === '/api/status' && method === 'GET') return json({ ready: Boolean(env.OPENAI_API_KEY && (env.APP_ACCESS_CODE?.length ?? 0) >= 12), voice: 'realtime', turnDetection: 'semantic_vad', version: '0.3.2' });
+  if (path === '/api/status' && method === 'GET') return json({ ready: Boolean(env.OPENAI_API_KEY && (env.APP_ACCESS_CODE?.length ?? 0) >= 12), voice: 'realtime', turnDetection: 'semantic_vad', version: '0.4.0' });
   if (path === '/api/login' && method === 'POST') {
     const input = await body(request);
     await quota(env, `login:${await hash(request.headers.get('cf-connecting-ip') ?? 'local')}`, 10, 600);
@@ -255,13 +257,15 @@ async function route(request: Request, env: Bindings) {
 
 export default {
   async scheduled(_event: ScheduledController, env: Bindings): Promise<void> {
+    if (_event.cron === "* * * * *") { await tickNotion(env); return; }
     await env.DB.batch([
       env.DB.prepare('DELETE FROM visitors WHERE expires_at<?').bind(now()),
       env.DB.prepare('DELETE FROM quotas WHERE expires_at<?').bind(now()),
       env.DB.prepare('DELETE FROM admin_sessions WHERE expires_at<?').bind(now()),
     ]);
   },
-  async fetch(request: Request, env: Bindings): Promise<Response> {
+  async fetch(request: Request, env: Bindings, ctx: ExecutionContext): Promise<Response> {
+    if (new URL(request.url).pathname.startsWith("/api/notion/")) return notionRoute(request,env,ctx);
     try { return await route(request,env); }
     catch (error) {
       if (error instanceof HttpError) return json({error:error.message},error.status);

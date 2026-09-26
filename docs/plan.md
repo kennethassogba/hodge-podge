@@ -27,7 +27,7 @@ Mise à jour : 26 septembre 2026.
 
 1. **Séb : essayer une séance et vérifier la fidélité au script anglais original.** Juger si les questions aident, si le rythme convient, si le coach impose une action. Noter les phrases précises à corriger.
 2. **Kenneth et Fano : vérifier sur leurs appareils.** Micro, casque, plusieurs réponses successives, silences, interruption, respect du script, notes puis nouvelle séance. Le résultat attendu est dans `silence.md`.
-3. **Inviter quelques testeurs et lire leurs retours dans /team.html, puis ajuster les prompts et le rythme.** Rejouer les scénarios concernés ; éviter d’ajouter une nouvelle intégration avant la démo.
+3. **Inviter quelques testeurs et lire leurs retours dans /team.html, puis ajuster les prompts et le rythme.** Rejouer les scénarios concernés ; valider séparément le nouveau parcours Notion avant de l’ouvrir aux testeurs.
 4. **Préparer et enregistrer la vidéo.** Séb joue un cas fictif ; un autre membre filme l’écran et contrôle le son. Montrer un échange vocal réel sans masquer les temps de réponse par le montage.
 5. **Déposer.** Compléter les trois noms, vérifier l’accès au repo et à la vidéo, remettre les quatre livrables avant l’échéance.
 
@@ -35,4 +35,13 @@ Répartition proposée, à adapter entre les trois membres. Le README et ce doss
 
 ## Ce qui reste hors de cette version
 
-Notion, agenda, prise de rendez-vous, rappels, Telegram, WhatsApp, téléphone, plugin ChatGPT, autres fournisseurs de modèles. On pourra les réexaminer après un premier essai utile avec Séb.
+Agenda, prise de rendez-vous, rappels, Telegram, WhatsApp, téléphone, plugin ChatGPT, autres fournisseurs de modèles. On pourra les réexaminer après un premier essai utile avec Séb.
+
+## Suite retenue : Notion
+
+- [x] Parcours facultatif séparé, OAuth, identité personnelle Notion et isolation des comptes.
+- [x] Examen documenté par trois agents, reprise en arrière-plan et publication après relecture.
+- [x] Activer les identifiants OAuth et déployer la version 0.4.0 sur Cloudflare.
+- [ ] Réaliser un essai réel dans un espace Notion de test : autorisation, analyse puis publication.
+
+Guide d’activation et recette : `notion.md`.

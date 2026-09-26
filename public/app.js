@@ -1,5 +1,5 @@
-import { QUESTIONS, QUESTIONS_EN } from './coaching-protocol.js?v=0.3.2';
-import { t, getLanguage, initLanguage, setLanguage } from './i18n.js?v=0.3.2';
+import { QUESTIONS, QUESTIONS_EN } from './coaching-protocol.js?v=0.4.0';
+import { t, getLanguage, initLanguage, setLanguage } from './i18n.js?v=0.4.0';
 initLanguage(document);
 
 const $ = id => document.getElementById(id);
@@ -52,6 +52,7 @@ function render() {
     actions.append(edit,remove);card.append(actions);return card;
   }));
   $('note-empty').hidden=state.notes.length>0;
+  $('notion-next').hidden=Boolean(call)||Boolean(busy)||Boolean(pendingSave)||!(state.notes.length||state.calls?.length||state.messages.length>=2);
   renderFeedback();
   updateControls();
 }

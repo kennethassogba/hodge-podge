@@ -43,6 +43,10 @@ L’audio brut n’est pas enregistré par notre application. Le transport audio
 
 ## Limites de cette première version
 
-Pas de compte multiappareil, agenda, notifications ni Notion. L’appel nécessite HTTPS ou localhost. La clôture tente de raccrocher côté OpenAI puis sauvegarde les transcriptions reçues ; une page fermée brutalement peut les perdre. Les réponses interrompues sont exclues de la transcription enregistrée pour ne pas conserver comme entendue leur partie non jouée.
+Le coaching reste lié au navigateur. La suite Notion dispose de son propre compte OAuth multiappareil, décrit dans `notion.md`. Pas d’agenda ni de notifications. L’appel nécessite HTTPS ou localhost. La clôture tente de raccrocher côté OpenAI puis sauvegarde les transcriptions reçues ; une page fermée brutalement peut les perdre. Les réponses interrompues sont exclues de la transcription enregistrée pour ne pas conserver comme entendue leur partie non jouée.
 
 Les quotas de messages, notes proposées et appels ont été retirés ; la coupure des appels a été portée à vingt minutes en version 0.3.2. Une session Realtime reste limitée à 60 minutes par OpenAI. Les garde-fous de connexion, l’isolation des espaces et la limitation des tentatives de connexion demeurent. Le code partagé est destiné aux essais privés.
+
+## Suite Notion (0.4.0)
+
+Un module distinct reçoit les routes `/api/notion/*`, sans modifier l’authentification du coach. OAuth Notion ouvre un espace personnel séparé. Une migration D1 ajoute comptes chiffrés, sessions, états OAuth et travaux. Trois appels LLM successifs enquêtent, vérifient et rédigent ; un veto du vérificateur bloque la rédaction. Les étapes sont persistées et reprises par une tâche chaque minute. La publication est un endpoint séparé, soumis à validation explicite. Voir `notion.md` pour les bornes de lecture, la conservation et les erreurs de publication.

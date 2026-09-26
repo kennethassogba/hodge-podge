@@ -1,4 +1,5 @@
 export const EN = {
+  'Poursuivre avec mes documents Notion ↗':'Continue with my Notion documents ↗',
   'Les vingt minutes sont écoulées. Tu peux garder quelques notes.':'The twenty minutes are up. You can keep a few notes.',
   'Prends le temps de répondre. L’appel se termine automatiquement après 20 minutes.':'Take your time to answer. The call ends automatically after 20 minutes.',
   'Appel':'Call',
