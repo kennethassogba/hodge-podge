@@ -36,7 +36,7 @@ Séance 2 : le coach rappelle précisément l’essai, demande ce qui s’est pa
 |---|---|---|
 | Impact et utilité réelle | 30 % | Une situation précise, une expérience choisie et un retour utile |
 | Innovation et originalité | 20 % | Silence protégé et adaptation à ce qui a été réellement tenté |
-| Qualité de réalisation | 20 % | Contrôle de la voix, mémoire persistante, erreurs prises en charge |
+| Qualité de réalisation | 20 % | Silences automatiques, fidélité au script, mémoire persistante, erreurs prises en charge |
 | Expérience utilisateur | 15 % | Parcours court, utilisateur maître du rythme et de ses données |
 | Clarté de la démo et du pitch | 15 % | Une histoire complète, compréhensible en moins de deux minutes |
 
@@ -50,7 +50,7 @@ Source : [règlement officiel, sections 6–7](https://app.notion.com/p/X-IA-Hac
 - [ ] README : installation propre, configuration sans secrets, démarrage, test vocal et deuxième séance.
 - [ ] Prérequis d’accès aux API et limites de l’essai explicités.
 - [ ] Noms complets : Kenneth, Séb, Fano.
-- [ ] Travail antérieur déclaré : PDF Kedo du 24 septembre et tout code ou bibliothèque réutilisé ; contribution du week-end identifiée.
+- [ ] Travail antérieur déclaré : questions du PDF Kedo du 24 septembre intégrées à la demande de l’équipe, et tout code ou bibliothèque réutilisé ; contribution du week-end identifiée.
 - [ ] Autorisation confirmée pour tout contenu tiers inclus ; ne pas publier le PDF intégral par défaut.
 - [ ] Données fictives, aucun secret ou compte rendu personnel dans le dépôt ou la vidéo.
 - [ ] Modalités exactes de dépôt confirmées sur le Discord officiel.

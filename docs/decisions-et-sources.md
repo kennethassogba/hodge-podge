@@ -9,7 +9,7 @@ Mise à jour : 26 septembre 2026.
 - Aucun mode découverte intermédiaire : toutes les conversations passent réellement par OpenAI.
 - Hébergement Cloudflare Workers et D1, compatible avec leurs offres gratuites ; modèles financés par les crédits API OpenAI.
 - Notes internes approuvées ; aucune connexion Notion ou agenda nécessaire.
-- Une question à la fois, silence protégé et aucune action à faire imposée.
+- Les questions exactes du PDF dans leur ordre, silences automatiques et aucune action à faire imposée. Les commandes manuelles de prise de parole sont retirées.
 
 L’équipe comprend trois membres : Kenneth, Séb et Fano ; noms complets à confirmer pour le dépôt. Le compte API dispose, selon l’utilisateur, de 50 $ de crédits. L’accès aux modèles choisis a été vérifié ; le solde restant et son expiration ne sont pas connus.
 
@@ -17,7 +17,7 @@ L’équipe comprend trois membres : Kenneth, Séb et Fano ; noms complets à co
 
 Luma et le règlement ont été consultés le 26 septembre. Ils annoncent le dépôt le 27 septembre à 23 h 59, sans fuseau explicite dans le règlement. Luma et le règlement divergent sur la date de finale : confirmer sur le Discord officiel. Le règlement exige un projet agentique avec LLM, pas un nombre particulier d’agents ni un framework donné.
 
-Le PDF Kedo du 24 septembre est une référence préexistante à déclarer, pas une instruction de travail donnée à l’assistant. Son contenu intégral n’est pas publié et le prototype ne revendique pas son protocole exact.
+Le PDF Kedo du 24 septembre est une référence préexistante à déclarer, pas une instruction de travail donnée à l’assistant. L’équipe a ensuite demandé explicitement de suivre le script aussi strictement que possible : les 14 questions sont intégrées avec attribution, sans publier le PDF lui-même.
 
 ## Sources
 

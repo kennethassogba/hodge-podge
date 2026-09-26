@@ -15,9 +15,9 @@ Le frontend est en HTML/CSS/JavaScript, sans framework. Un Worker TypeScript ser
 
 ## La logique d’agent
 
-Pour chaque message, le serveur retrouve le fil et les notes approuvées. Le LLM choisit une intention de conversation — clarifier, reformuler, explorer ou clôturer — et formule sa réponse dans un schéma JSON vérifié. Le choix et la réponse sont enregistrés. Il n’y a pas de questionnaire à embranchements fixes ni de réponses préécrites.
+Pour chaque message, le serveur retrouve le fil et les notes approuvées. Le LLM choisit une intention de conversation — clarifier, reformuler, explorer ou clôturer — et formule sa réponse dans un schéma JSON vérifié. Le choix et la réponse sont enregistrés. Le contenu de la bulle suit les questions originales du PDF ; le modèle identifie où en est l’échange et traite les demandes de clarification ou d’arrêt.
 
-En vocal, Realtime adapte la conversation au contexte. La détection vocale ne déclenche jamais seule une réponse (`create_response: false`). Le contrôleur de tours autorise `response.create` après le silence protégé ou une commande explicite. Les décisions texte affichées ne sont pas une trace du raisonnement interne ni une analyse de la séance vocale.
+En vocal, Realtime suit le protocole Kedo. Un curseur côté navigateur indique la prochaine question exacte. Il avance seulement quand cette question a été générée intégralement et que sa lecture est terminée sans interruption. Une explication ne fait pas sauter une étape. La détection vocale ne déclenche jamais seule une réponse (`create_response: false`). Le contrôleur de tours autorise `response.create` après le silence protégé. La transcription de la voix entrante est facultative pour cette orchestration : Realtime comprend directement l’audio. Une transcription manquante ne suspend plus l’appel. Les décisions texte affichées ne sont pas une trace du raisonnement interne ni une analyse de la séance vocale.
 
 Sur demande, une seconde tâche LLM propose les notes de fin de séance. Cette proposition ne modifie pas la mémoire. Seul **Conserver** écrit une note qui sera disponible lors des prochaines séances. Le projet utilise deux tâches LLM coordonnées, pas une collection artificielle d’agents autonomes.
 

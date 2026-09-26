@@ -1,6 +1,6 @@
 # La Bulle — Hodge Podge
 
-Une application de coaching par messages et appel vocal. Une question à la fois, du temps pour réfléchir, et des notes que la personne choisit de garder pour la prochaine séance. Projet du hackathon X-IA, construit avec OpenAI et Cloudflare.
+Une application de coaching par messages et appel vocal. Les questions du protocole Kedo, une à la fois, du temps pour réfléchir, et des notes que la personne choisit de garder pour la prochaine séance. Projet du hackathon X-IA, construit avec OpenAI et Cloudflare.
 
 ## Essayer
 
@@ -12,7 +12,7 @@ L’application utilise réellement OpenAI : aucun mode découverte ni réponse 
 
 1. Écrire une situation dans le champ de message et entrer le code d’accès.
 2. Envoyer le message, ou choisir **Appeler** et autoriser le microphone.
-3. Pendant l’appel, le coach attend cinq secondes après la fin de parole détectée. **Je réfléchis** suspend les relances jusqu’à **À toi**. On peut interrompre le coach en parlant.
+3. Pendant l’appel, parle naturellement : le coach attend cinq secondes après tes premières réponses, puis trois secondes dans la suite de la bulle. Toute reprise de parole recommence ce délai. Il n’y a aucun bouton de prise de parole ; seul **Raccrocher** reste affiché.
 4. Raccrocher, choisir **Garder quelques notes**, corriger la proposition puis **Conserver**.
 5. Ouvrir une **Nouvelle séance** : les notes conservées accompagnent le nouvel échange.
 
@@ -41,6 +41,15 @@ npm run build
 
 Les tests utilisent une vraie base D1 locale et un fournisseur OpenAI simulé, sans consommer de crédits. Ils couvrent l’isolation des espaces, les permissions, les décisions du coach, l’approbation de la mémoire et les silences. `build` vérifie le déploiement sans publier.
 
+Un test audio réseau optionnel rejoue trois questions avec deux réponses synthétiques, sans activer le microphone. Il consomme un peu de crédit OpenAI et utilise `.dev.vars`. Dans un environnement Python disposant de `aiohttp` et `aiortc`, et avec Node.js sur le PATH :
+
+```sh
+python scripts/check-voice.py http://127.0.0.1:8787
+# Ou passer l’URL du déploiement à vérifier.
+```
+
+L’espace fictif créé par ce test est supprimé à la fin. Les tests `npm test` restent entièrement locaux et sans crédit API.
+
 ## Hébergement
 
 Cloudflare Workers sert la page et l’API ; D1 conserve les données. Pas de serveur à louer, de numéro de téléphone ni de domaine à acheter : une adresse `workers.dev` suffit. Le projet reste compatible avec les quotas gratuits Workers et D1. Les appels OpenAI sont payants, couverts d’abord par les crédits disponibles ; ce n’est pas un service IA gratuit illimité.
@@ -58,9 +67,9 @@ Pour un autre compte, créer d’abord une base avec `npx wrangler d1 create hod
 
 ## Ce qui est implémenté
 
-Messages et appel WebRTC OpenAI, contrôle des tours de parole, reprise après interruption, historique, notes modifiables et supprimables, mémoire entre séances, effacement de l’espace et code d’accès. Le modèle texte choisit entre clarifier, reformuler, explorer et clôturer ; son choix est visible dans le volet technique. Un second appel au modèle prépare une note, dont la sauvegarde exige une action de la personne.
+Messages et appel WebRTC OpenAI, silences automatiques, reprise après interruption, historique, notes modifiables et supprimables, mémoire entre séances, effacement de l’espace et code d’accès. Le modèle texte choisit entre clarifier, reformuler, explorer et clôturer ; son choix est visible dans le volet technique. Un second appel au modèle prépare une note, dont la sauvegarde exige une action de la personne.
 
-L’agent vocal reçoit le fil récent et les notes approuvées. Le code décide **quand** il peut répondre ; le LLM décide **quoi** dire. Le logiciel ne prétend ni lire un agenda ni envoyer un rappel. Notion, Telegram et les autres fournisseurs sont hors de cette version.
+L’agent vocal reçoit le fil récent et les notes approuvées. Le code décide **quand** il peut répondre et indique la prochaine question du PDF. Le modèle la prononce mot pour mot, sauf demande explicite de répétition, explication, temps ou arrêt. Le logiciel ne prétend ni lire un agenda ni envoyer un rappel. Notion, Telegram et les autres fournisseurs sont hors de cette version.
 
 ## Données et limites
 
@@ -84,4 +93,4 @@ L’agent vocal reçoit le fil récent et les notes approuvées. Le code décide
 
 Ce dépôt est le point central pour les trois membres. Les documents sont modifiables depuis GitHub. Les noms complets, la vidéo et le dépôt au hackathon restent à compléter. Échéance annoncée : 27 septembre 2026 à 23 h 59, fuseau à confirmer auprès de l’organisation.
 
-Référence de coaching : exemple Kedo transmis par Séb, daté du 24 septembre 2026. Le protocole intégral n’est ni reproduit ni revendiqué : cette application est une adaptation à faire valider par Séb. Police Manrope distribuée avec sa licence OFL dans `public/fonts/LICENSE-manrope.txt`.
+Référence de coaching : exemple Kedo transmis par Séb, daté du 24 septembre 2026. À la demande explicite de l’équipe, les 14 questions originales sont intégrées dans `public/coaching-protocol.js` avec leur attribution. Leur ordre et leur formulation servent de référence stricte. La fidélité vocale et la qualité de l’écoute restent à valider avec Séb. Police Manrope distribuée avec sa licence OFL dans `public/fonts/LICENSE-manrope.txt`.

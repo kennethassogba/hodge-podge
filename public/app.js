@@ -1,4 +1,5 @@
 import { TurnController } from './turn-controller.js';
+import { CoachingProtocol } from './coaching-protocol.js';
 
 const $ = id => document.getElementById(id);
 let state = { threads: [], messages: [], notes: [], decisions: [], threadId: null };
@@ -92,18 +93,21 @@ $('erase-button').onclick=()=>guard(async()=>{
 
 function send(c,event) {if(call===c && c.channel?.readyState==='open')c.channel.send(JSON.stringify(event));}
 function interrupt(c) {
-  if(c.responseActive)send(c,{type:'response.cancel'});
+  if(c.responseActive&&!c.cancelSent){send(c,{type:'response.cancel'});c.cancelSent=true;}
   if(c.playing || c.responseActive)send(c,{type:'output_audio_buffer.clear'});
   for(const key of c.currentItems){const item=c.transcript.get(key);if(item)item.interrupted=true;}
-  c.currentItems.clear();c.audio.muted=true;c.playing=false;c.responseActive=false;c.authorized=false;
+  if(c.output&&!c.output.played)c.output.interrupted=true;
+  c.currentItems.clear();c.audio.muted=true;c.playing=false;c.authorized=false;
 }
 function callState(c,s) {
   if(call!==c)return;
-  $('hold-button').setAttribute('aria-pressed',String(s.held));$('mute-button').setAttribute('aria-pressed',String(s.muted));
-  $('mute-button').textContent=s.muted?'Activer le micro':'Couper le micro';
-  $('call-status').textContent=s.held?'Prends tout ton temps.':s.muted?'Ton micro est coupé.':s.speaking?'Je t’écoute.':s.requested?'Le coach prépare sa réponse…':'Je t’écoute.';
-  $('call-hint').textContent=s.held?'La conversation reprend quand tu choisis « À toi ».':'Les pauses font aussi partie de la conversation.';
+  $('call-status').textContent=s.speaking?'Je t’écoute.':s.requested?'Le coach prépare sa réponse…':'Prends ton temps.';
+  $('call-hint').textContent='Parle librement. Les silences font partie de la conversation.';
   $('call-panel').dataset.state=s.speaking?'speaking':'listening';
+}
+function finishQuestion(c){
+  const o=c.output;
+  if(o?.completed&&o.played&&!o.interrupted&&!o.applied&&o.text){c.protocol.heard(o.text);o.applied=true;}
 }
 function transcript(c,key,role) {if(!c.transcript.has(key))c.transcript.set(key,{role,text:'',order:c.sequence++});return c.transcript.get(key);}
 function handleEvent(c,e) {
@@ -113,57 +117,66 @@ function handleEvent(c,e) {
   }else if(e.type==='input_audio_buffer.speech_stopped')c.turns.speechStop(e.item_id);
   else if(e.type==='conversation.item.input_audio_transcription.completed'){
     transcript(c,e.item_id,'user').text=e.transcript||'';
-    // Explicit words work as a convenience; the visible controls remain authoritative.
-    if(/\b(attends?|laisse[- ]moi réfléchir|je réfléchis)\b/i.test(e.transcript||''))c.turns.hold();
-    c.turns.transcriptDone(e.item_id);
-    if(/^\s*(à toi|a toi|tu peux répondre)[.!?\s]*$/i.test(e.transcript||''))c.turns.giveFloor();
   }else if(e.type==='conversation.item.input_audio_transcription.failed'){
-    c.turns.hold();c.turns.transcriptDone(e.item_id);error('La transcription a échoué. Le coach reste en pause ; tu peux reprendre ou raccrocher.');
+    // Realtime understands audio directly; a missing transcript must not stop the call.
+    error('Un passage n’a pas pu être transcrit. La conversation continue.');
   }else if(e.type==='response.created'){
-    c.responseActive=true;
-    if(!c.authorized || c.turns.held || c.turns.speaking || c.turns.muted)interrupt(c);
+    clearTimeout(c.responseTimer);c.responsePending=false;c.responseActive=true;c.cancelSent=false;
+    c.output={id:e.response.id,text:'',completed:false,played:false,interrupted:false,applied:false};
+    c.responseTimer=setTimeout(()=>{if(call===c)void endCall('Le service vocal ne répond plus. Tu peux relancer l’appel.');},45000);
+    if(!c.authorized || c.turns.speaking)interrupt(c);
   }else if(e.type==='response.output_item.added' && e.item?.role==='assistant'){
     c.currentItems.add(e.item.id);transcript(c,e.item.id,'assistant');
   }else if(e.type==='response.output_audio_transcript.done'){
     transcript(c,e.item_id,'assistant').text=e.transcript||'';
+    if(c.output?.id===e.response_id){c.output.text=e.transcript||'';finishQuestion(c);}
   }else if(e.type==='output_audio_buffer.started'){
-    if(!c.authorized || c.turns.held || c.turns.speaking || c.turns.muted){interrupt(c);return;}
+    if(!c.authorized || c.turns.speaking){interrupt(c);return;}
     c.playing=true;c.audio.muted=false;$('call-status').textContent='Le coach te répond.';
   }else if(e.type==='output_audio_buffer.stopped'){
-    c.playing=false;c.currentItems.clear();callState(c,{active:true,held:c.turns.held,muted:c.turns.muted,speaking:c.turns.speaking});
+    if(e.response_id&&c.output?.id!==e.response_id)return;
+    if(c.output){c.output.played=true;finishQuestion(c);}
+    c.playing=false;c.currentItems.clear();callState(c,{active:true,speaking:c.turns.speaking});
   }else if(e.type==='response.done'){
-    c.responseActive=false;c.turns.responseDone();
-    if(e.response?.status==='failed'){c.turns.hold();error('Le coach n’a pas pu répondre. Vérifie les crédits ou termine l’appel pour réessayer.');}
+    if(c.output?.id!==e.response?.id)return;
+    clearTimeout(c.responseTimer);c.responseActive=false;
+    c.output.completed=e.response.status==='completed';finishQuestion(c);
+    if(e.response.status==='failed'||e.response.status==='incomplete'){
+      void endCall('Le service vocal n’a pas pu terminer sa réponse. Tu peux relancer l’appel.');return;
+    }
+    c.turns.responseDone();
   }else if(e.type==='error'){
     if(['response_cancel_not_active','output_audio_buffer_clear_no_active_response'].includes(e.error?.code))return;
-    c.turns.hold();error('Un problème audio est survenu. L’appel est en pause ; tu peux raccrocher et réessayer.');
+    void endCall('La connexion vocale a rencontré une erreur. Tu peux relancer l’appel.');
   }
 }
 async function startCall(){
   if(!access()||call||busy||pendingSave)return;
   if(!navigator.mediaDevices?.getUserMedia)throw new Error('Le micro nécessite HTTPS ou localhost et un navigateur compatible.');
   await ensureThread();
-  const c={peer:new RTCPeerConnection(),audio:new Audio(),stream:null,channel:null,turns:null,callId:null,sequence:0,transcript:new Map(),currentItems:new Set(),responseActive:false,playing:false,authorized:false,ending:false};
+  const c={peer:new RTCPeerConnection(),audio:new Audio(),stream:null,channel:null,turns:null,callId:null,sequence:0,transcript:new Map(),currentItems:new Set(),responseActive:false,responsePending:false,cancelSent:false,protocol:new CoachingProtocol(),output:null,playing:false,authorized:false,ending:false};
   call=c;render();$('call-panel').hidden=false;$('call-status').textContent='Autorise le micro pour commencer.';$('call-time').textContent='00:00';
   c.audio.autoplay=true;c.audio.muted=true;
   const respond=()=>{
-    if(call!==c||c.responseActive)return;
+    if(call!==c||c.channel?.readyState!=='open'||c.responseActive||c.responsePending)return false;
     c.authorized=true;c.audio.muted=false;c.currentItems.clear();
-    send(c,{type:'response.create'});
+    c.responsePending=true;
+    send(c,{type:'response.create',response:{instructions:c.protocol.instructions()}});
+    clearTimeout(c.responseTimer);c.responseTimer=setTimeout(()=>{if(call===c)void endCall('Le service vocal ne répond plus. Tu peux relancer l’appel.');},20000);
+    return true;
   };
-  c.turns=new TurnController({respond,interrupt:()=>interrupt(c),changed:s=>callState(c,s)});
+  c.turns=new TurnController({delay:()=>c.protocol.next<=3?5000:3000,respond,interrupt:()=>interrupt(c),changed:s=>callState(c,s)});
   try{
     const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
     if(call!==c){stream.getTracks().forEach(t=>t.stop());return;}
     c.stream=stream;stream.getTracks().forEach(t=>c.peer.addTrack(t,stream));
     c.peer.ontrack=e=>{c.audio.srcObject=e.streams[0];c.audio.play().catch(()=>error('La lecture audio est bloquée par le navigateur. Autorise le son puis relance l’appel.'));};
     c.channel=c.peer.createDataChannel('oai-events');
-    c.channel.onmessage=e=>{try{handleEvent(c,JSON.parse(e.data));}catch{c.turns.hold();error('Événement audio inattendu : l’appel est en pause.');}};
+    c.channel.onmessage=e=>{try{handleEvent(c,JSON.parse(e.data));}catch{void endCall('La connexion vocale a rencontré un problème. Tu peux relancer l’appel.');}};
     c.channel.onopen=()=>{
       if(call!==c)return;c.turns.start();c.started=Date.now();
       c.ticker=setInterval(()=>{const seconds=Math.floor((Date.now()-c.started)/1000);$('call-time').textContent=`${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`;if(seconds>=600)void endCall('Les dix minutes sont écoulées. Tu peux garder quelques notes.');},1000);
-      // Greeting only; subsequent turns go through the protected silence controller.
-      c.authorized=true;c.audio.muted=false;send(c,{type:'response.create',response:{instructions:'Accueille brièvement la personne en français et demande de quoi elle souhaite parler. Si le fil contient déjà un sujet, demande si elle veut le reprendre. Une seule question.'}});
+      respond();
     };
     c.channel.onclose=()=>{if(call===c&&!c.ending)void endCall('La connexion audio a été fermée.');};
     c.peer.onconnectionstatechange=()=>{if(call!==c||c.ending)return;if(['failed','disconnected'].includes(c.peer.connectionState))void endCall('La connexion a été interrompue. Les propos reçus sont conservés si possible.');};
@@ -181,7 +194,7 @@ async function saveCall(){
 }
 async function endCall(message=''){
   const c=call;if(!c||c.ending)return;c.ending=true;c.turns?.stop();
-  interrupt(c);clearInterval(c.ticker);clearTimeout(c.connectionTimer);
+  interrupt(c);clearInterval(c.ticker);clearTimeout(c.connectionTimer);clearTimeout(c.responseTimer);
   c.stream?.getTracks().forEach(t=>t.stop());c.channel?.close();c.peer.close();c.audio.pause();c.audio.srcObject=null;
   call=null;$('call-panel').hidden=true;
   const messages=[...c.transcript.values()].sort((a,b)=>a.order-b.order).filter(m=>m.text.trim()&&!m.interrupted).map(m=>({role:m.role,text:m.text}));
@@ -192,9 +205,6 @@ async function endCall(message=''){
 }
 $('call-button').onclick=()=>guard(startCall);
 $('hangup-button').onclick=()=>{void endCall();};
-$('hold-button').onclick=()=>call?.turns.hold();
-$('floor-button').onclick=()=>call?.turns.giveFloor();
-$('mute-button').onclick=()=>{if(!call)return;const muted=!call.turns.muted;call.stream?.getAudioTracks().forEach(t=>t.enabled=!muted);call.turns.mute(muted);};
 window.addEventListener('offline',()=>{document.body.classList.add('offline');error('Tu es hors connexion. Ton message reste ici.');if(call)void endCall('Connexion perdue. Garde cette page ouverte pour sauvegarder le fil.');updateControls();});
 window.addEventListener('online',()=>{document.body.classList.remove('offline');updateControls();if(pendingSave)void guard(saveCall);else error();});
 window.addEventListener('beforeunload',event=>{if(call||pendingSave){event.preventDefault();event.returnValue='';}});

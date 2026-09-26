@@ -1,39 +1,26 @@
-# Le silence, concrètement
+# Une conversation sans commandes
 
-Implémentation : `public/turn-controller.js` et gestion WebRTC dans `public/app.js`.
+L’utilisateur parle et peut reprendre sa phrase naturellement. Aucun bouton **À toi**, **Je réfléchis** ou **Couper le micro**. Le seul contrôle de l’appel est **Raccrocher**.
 
-## Règles actuelles
+## Rythme
 
-| Situation | Comportement |
-|---|---|
-| Fin de parole détectée | Démarrer cinq secondes de silence protégé |
-| Reprise avant l’échéance | Annuler le délai ; repartir après la nouvelle fin de parole |
-| Transcription encore en cours | Attendre, même si les cinq secondes sont écoulées |
-| **Je réfléchis** | Interrompre le coach et suspendre les relances sans limite de silence |
-| La personne reparle pendant cette pause | Écouter ; la pause reste active après sa phrase |
-| **À toi** | Autoriser une réponse lorsque la parole et la transcription sont terminées |
-| Reprise pendant la réponse | Annuler la génération, vider le tampon audio et couper immédiatement la lecture locale |
-| Micro coupé ou appel terminé | Annuler les réponses en attente |
-| Aucun mot après l’accueil | Rester à l’écoute, sans relance automatique en boucle |
+Après une fin de parole détectée : cinq secondes de silence pour les trois premières questions, puis trois secondes. Chaque reprise de parole annule le délai et le redémarre à la fin de la nouvelle phrase. Ce sont des réglages initiaux à ajuster avec Séb, pas des normes de coaching. Le détecteur ajoute environ 400 ms et le réseau sa propre latence.
 
-Le détecteur OpenAI attend environ 400 ms pour signaler une fin de parole ; notre fenêtre de cinq secondes commence à cet événement. Le délai réel depuis le dernier son est donc plus long, avec la latence réseau. Il s’agit d’un choix à ajuster avec Séb, pas d’une norme de coaching.
+La réponse ne dépend pas de l’arrivée de la transcription écrite. Realtime reçoit déjà l’audio. Les expressions ordinaires telles que « je réfléchis à mon problème » ne sont plus interprétées comme des commandes de pause permanente.
 
-Les expressions « attends », « laisse-moi réfléchir » et « je réfléchis » peuvent aussi déclencher la pause après transcription. « À toi » ou « tu peux répondre », seuls dans une phrase, rendent la main. Les boutons sont plus fiables que la reconnaissance de ces expressions, qui peut se tromper sur une citation ou une négation.
+Le logiciel conserve le tour de l’utilisateur si une ancienne réponse est encore en cours d’annulation : il réessaie dès que la génération se libère. Une erreur bloquante termine l’appel avec un message explicite au lieu de laisser un faux état d’écoute.
 
-## Pourquoi ce n’est pas uniquement un prompt
+## Fidélité au PDF
 
-Realtime a `create_response: false`. Le logiciel pilote `response.create`, invalide les minuteries périmées et contrôle la lecture audio. La consigne donnée au modèle porte sur la qualité de la question ; elle n’assure pas le silence à elle seule.
+Les 14 questions originales, attribuées à Kedo Academy by Tirezio, se trouvent dans `public/coaching-protocol.js`. Une question à la fois, dans leur ordre et mot pour mot. Le curseur n’avance qu’après la lecture complète de la question attendue. Une demande explicite d’explication ou de répétition peut être traitée brièvement sans sauter une étape. Après la dernière réponse, un remerciement, sans nouvelle question.
 
-## Tests
+La génération vocale reste effectuée par un modèle : le suivi d’ordre est contrôlé par le code, la fidélité du texte prononcé doit aussi être éprouvée en conditions réelles.
 
-Les tests déterministes vérifient les cinq secondes, une reprise à 4,8 secondes, une pause volontaire de vingt secondes, la persistance de cette pause, une transcription retardée, le micro coupé et la déconnexion. L’horloge est simulée ; cela ne mesure pas la latence d’un vrai microphone.
+## Vérifications
 
-Recette à réaliser avec Séb, sur ordinateur puis téléphone :
+- Contrôleur : pauses, reprise à 4,8 secondes, absence totale de transcription, annulation lente et déconnexion.
+- Interface réelle exécutée avec un transport simulé : accueil, deux réponses successives, transcription en échec, phrase contenant « je réfléchis », progression des questions et interruption.
+- Protocole : toutes les questions dans l’ordre, refus des paraphrases comme preuve d’avancement, clarification sans saut et fin après la question 14.
+- Essai audio réseau : trois questions et deux réponses synthétiques, avec pauses réelles.
 
-1. Parler, faire une pause de deux secondes, reprendre : le coach ne doit pas commencer sa réponse.
-2. Après une question, choisir **Je réfléchis**, attendre vingt secondes et reparler : aucune relance jusqu’à **À toi**.
-3. Interrompre le coach au milieu d’une phrase : vérifier ce qu’on entend et le fil enregistré.
-4. Couper le micro, puis raccrocher : pas de réponse retardée ni de micro laissé actif.
-5. Refuser le microphone et tester une coupure réseau : pouvoir continuer par écrit ou réessayer la sauvegarde.
-
-Le bruit ambiant, les permissions du navigateur et les interruptions pendant la génération restent à éprouver dans les conditions de démo. Ne pas présenter les tests automatiques comme une validation de tout le trajet audio.
+À refaire avec Séb : répondre à la première question, hésiter, reprendre, laisser le silence, demander de répéter une question, puis aller jusqu’au bilan final. Vérifier aussi sur téléphone et avec un bruit ambiant modéré.
