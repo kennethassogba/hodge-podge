@@ -2,7 +2,7 @@
 
 ## Partager l’application
 
-Adresse : https://hodge-podge.kennethassogba.workers.dev/
+Adresse : https://bulle.hodge-podge.workers.dev/
 
 Partager le code APP_ACCESS_CODE uniquement aux testeurs invités. Ne pas partager ADMIN_ACCESS_CODE : il ouvre le tableau équipe /team.html. Le code administrateur local est dans .dev.vars.admin, ignoré par Git. Les données restent propres à chaque navigateur ; pas de compte multiappareil.
 
@@ -39,3 +39,9 @@ Aucun quota applicatif quotidien pour les appels, le texte ou les notes proposé
 Ouvrir /team.html ou le lien « Espace équipe » en pied de page. Utiliser ADMIN_ACCESS_CODE dans le fichier local .dev.vars.admin, et non le code destiné aux testeurs. Le code administrateur a été installé sur Cloudflare avec l’accord explicite de Kenneth. Il est réservé à Kenneth, Séb et Fano.
 
 La coupure à dix minutes ferme le micro et le transport, sauvegarde le fil et propose le retour facultatif. C’est une fin normale, pas une erreur dans les statistiques. Elle dépend de l’exécution du navigateur ; elle n’est pas un plafond financier côté serveur.
+
+## Changement d’adresse du 26 septembre 2026
+
+La Bulle est désormais sur https://bulle.hodge-podge.workers.dev/ et l’administration sur `/team.html`, avec les mêmes codes. Le Worker existant a été renommé ; la base D1, les secrets et la purge quotidienne sont conservés. Les cookies ne passent pas d’un domaine à l’autre : les espaces personnels précédents ne sont pas automatiquement accessibles depuis la nouvelle adresse. Les retours partagés restent consultables par l’équipe.
+
+Le sous-domaine du compte Cloudflare est `hodge-podge`. Amata conserve ses domaines personnalisés `amata.coffee` et `www.amata.coffee` ; son accès workers.dev était et reste désactivé.
