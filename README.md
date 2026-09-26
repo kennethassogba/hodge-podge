@@ -12,7 +12,7 @@ L’application utilise réellement OpenAI : aucun mode découverte ni réponse 
 
 1. Écrire une situation dans le champ de message et entrer le code d’accès.
 2. Envoyer le message, ou choisir **Appeler** et autoriser le microphone.
-3. Pendant l’appel, parle naturellement : le coach attend cinq secondes après tes premières réponses, puis trois secondes dans la suite de la bulle. Toute reprise de parole recommence ce délai. Il n’y a aucun bouton de prise de parole ; seul **Raccrocher** reste affiché.
+3. Pendant l’appel, parle naturellement : OpenAI détecte quand tu as terminé et répond directement. Les minuteries de silence ajoutées dans le navigateur ont été retirées. Il n’y a aucun bouton de prise de parole ; seul **Raccrocher** reste affiché.
 4. Raccrocher, choisir **Garder quelques notes**, corriger la proposition puis **Conserver**.
 5. Ouvrir une **Nouvelle séance** : les notes conservées accompagnent le nouvel échange.
 
@@ -39,7 +39,7 @@ npm test
 npm run build
 ```
 
-Les tests utilisent une vraie base D1 locale et un fournisseur OpenAI simulé, sans consommer de crédits. Ils couvrent l’isolation des espaces, les permissions, les décisions du coach, l’approbation de la mémoire et les silences. `build` vérifie le déploiement sans publier.
+Les tests utilisent une vraie base D1 locale et un fournisseur OpenAI simulé, sans consommer de crédits. Ils couvrent l’isolation des espaces, les permissions, les décisions du coach, l’approbation de la mémoire et les reprises de conversation et le raccrochage. `build` vérifie le déploiement sans publier.
 
 Un test audio réseau optionnel rejoue trois questions avec deux réponses synthétiques, sans activer le microphone. Il consomme un peu de crédit OpenAI et utilise `.dev.vars`. Dans un environnement Python disposant de `aiohttp` et `aiortc`, et avec Node.js sur le PATH :
 
@@ -48,7 +48,15 @@ python scripts/check-voice.py http://127.0.0.1:8787
 # Ou passer l’URL du déploiement à vérifier.
 ```
 
-L’espace fictif créé par ce test est supprimé à la fin. Les tests `npm test` restent entièrement locaux et sans crédit API.
+Pour vérifier aussi le code frontend dans le navigateur, après avoir généré le fichier audio avec ce test :
+
+```sh
+node scripts/browser-voice-test.mjs
+```
+
+Ouvrir http://127.0.0.1:8790, se connecter, puis **Appeler**. Le bouton de test **Envoyer une réponse audio fictive** injecte une phrase dans le vrai canal WebRTC du navigateur ; aucun microphone humain n’est ouvert. Répéter après chaque question, puis raccrocher. Les événements et questions s’affichent au-dessus de l’application. Ce banc n’est jamais déployé. Il vise le backend local par défaut ; `VOICE_TEST_UPSTREAM` peut désigner l’URL déployée.
+
+L’espace fictif créé par le test Python est supprimé à la fin. Les tests `npm test` restent entièrement locaux et sans crédit API.
 
 ## Hébergement
 
@@ -69,7 +77,7 @@ Pour un autre compte, créer d’abord une base avec `npx wrangler d1 create hod
 
 Messages et appel WebRTC OpenAI, silences automatiques, reprise après interruption, historique, notes modifiables et supprimables, mémoire entre séances, effacement de l’espace et code d’accès. Le modèle texte choisit entre clarifier, reformuler, explorer et clôturer ; son choix est visible dans le volet technique. Un second appel au modèle prépare une note, dont la sauvegarde exige une action de la personne.
 
-L’agent vocal reçoit le fil récent et les notes approuvées. Le code décide **quand** il peut répondre et indique la prochaine question du PDF. Le modèle la prononce mot pour mot, sauf demande explicite de répétition, explication, temps ou arrêt. Le logiciel ne prétend ni lire un agenda ni envoyer un rappel. Notion, Telegram et les autres fournisseurs sont hors de cette version.
+L’agent vocal reçoit le fil récent et les notes approuvées. Realtime gère directement les tours de parole et les interruptions avec `semantic_vad`. Les 14 questions du PDF sont dans les instructions du modèle, qui doit les suivre dans l’ordre et mot pour mot, sauf demande explicite de répétition, explication, temps ou arrêt. Le logiciel ne prétend ni lire un agenda ni envoyer un rappel. Notion, Telegram et les autres fournisseurs sont hors de cette version.
 
 ## Données et limites
 

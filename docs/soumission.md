@@ -12,7 +12,7 @@ Statut : trame préparée le 26 septembre 2026. Adapter au logiciel réellement 
 |---|---|---|
 | 0:00–0:12 | Une situation : « Je reprends toujours les tâches que je délègue » | Le problème apparaît dans une conversation réelle |
 | 0:12–0:25 | Message de contexte puis bouton Appeler | L’utilisateur choisit ce que le coach sait |
-| 0:25–0:55 | Une question, réponse, 5 secondes de silence réel et reprise spontanée | La personne peut poursuivre sa pensée sans être coupée |
+| 0:25–0:55 | Une question, réponse orale et reprise automatique réelle | La personne peut poursuivre sa pensée sans être coupée |
 | 0:55–1:15 | Quelques notes corrigées puis conservées avec accord | Le prochain pas vient de la personne |
 | 1:15–1:38 | Deuxième séance, explicitement simulée dans le temps, avec retour saisi | Le coach repart de ce qui a été tenté, pas d’un résumé générique |
 | 1:38–1:48 | Vue technique concise : décision LLM, outil, résultat persistant | On voit la logique agentique derrière l’expérience |
@@ -35,7 +35,7 @@ Séance 2 : le coach rappelle précisément l’essai, demande ce qui s’est pa
 | Critère officiel | Poids | Preuve à montrer |
 |---|---|---|
 | Impact et utilité réelle | 30 % | Une situation précise, une expérience choisie et un retour utile |
-| Innovation et originalité | 20 % | Silence protégé et adaptation à ce qui a été réellement tenté |
+| Innovation et originalité | 20 % | Conversation naturelle guidée par le protocole et reprise du vécu |
 | Qualité de réalisation | 20 % | Silences automatiques, fidélité au script, mémoire persistante, erreurs prises en charge |
 | Expérience utilisateur | 15 % | Parcours court, utilisateur maître du rythme et de ses données |
 | Clarté de la démo et du pitch | 15 % | Une histoire complète, compréhensible en moins de deux minutes |

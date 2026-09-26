@@ -28,4 +28,4 @@ Le PDF Kedo du 24 septembre est une référence préexistante à déclarer, pas 
 - [OpenAI Realtime — VAD](https://developers.openai.com/api/docs/guides/realtime-vad) : détection de parole et `create_response`.
 - [Cloudflare Workers — prix](https://developers.cloudflare.com/workers/platform/pricing/) et [D1 — prix](https://developers.cloudflare.com/d1/platform/pricing/) : quotas gratuits et limites.
 
-Les cinq secondes de silence et les limites d’essai sont nos choix produit. Les tarifs et interfaces des fournisseurs peuvent évoluer ; leur documentation ne remplace pas une recette sur l’application.
+Les attentes fixes ont été retirées après le bug navigateur : la fin de parole et la reprise sont désormais natives dans Realtime. Les limites d’essai restent nos choix produit. Les tarifs et interfaces des fournisseurs peuvent évoluer ; leur documentation ne remplace pas une recette sur l’application.

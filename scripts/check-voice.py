@@ -4,7 +4,7 @@ from aiortc import RTCPeerConnection,RTCSessionDescription,AudioStreamTrack
 ROOT=pathlib.Path(__file__).resolve().parent.parent
 NODE=shutil.which('node')
 assert NODE, 'Node.js must be available on PATH'
-protocol=json.loads(subprocess.check_output([NODE,'--input-type=module','-e',"import {CoachingProtocol,QUESTIONS} from './public/coaching-protocol.js';const p=new CoachingProtocol();console.log(JSON.stringify(QUESTIONS.slice(0,3).map(q=>{const instructions=p.instructions();p.heard(q);return {q,instructions};})));"],cwd=ROOT))
+protocol=json.loads(subprocess.check_output([NODE,'--input-type=module','-e',"import {QUESTIONS} from './public/coaching-protocol.js';console.log(JSON.stringify(QUESTIONS.slice(0,3)));"],cwd=ROOT))
 class Speech(AudioStreamTrack):
     def __init__(self):super().__init__();self.pts=0;self.start=None;self.buffer=b''
     async def recv(self):
@@ -31,13 +31,10 @@ async def main():
                 result=await r.json();assert r.status<400,(r.status,result);return result
         await post('login',{'code':values['APP_ACCESS_CODE'].strip().strip('"')});thread=await post('threads',{})
         peer=RTCPeerConnection();speech=Speech();peer.addTrack(speech);ch=peer.createDataChannel('oai-events');done=asyncio.Event();spoken=[];timers=[];stopped=None;requested=[];failure=[]
-        def respond():
-            index=len(spoken)
-            if index>=3:return
-            requested.append(time.monotonic());ch.send(json.dumps({'type':'response.create','response':{'instructions':protocol[index]['instructions']}}))
-            if stopped is not None:print('Protected pause:',round(requested[-1]-stopped,2),'seconds',flush=True)
         @ch.on('open')
-        def opened():respond()
+        def opened():
+            # The only client response.create. Later replies MUST be native.
+            requested.append(time.monotonic());ch.send(json.dumps({'type':'response.create'}))
         @ch.on('message')
         def event(raw):
             nonlocal stopped
@@ -46,10 +43,10 @@ async def main():
                 for t in timers:t.cancel()
                 timers.clear();print('User speech detected',flush=True)
             elif kind=='input_audio_buffer.speech_stopped':
-                stopped=time.monotonic();timers.append(asyncio.get_running_loop().call_later(5,respond))
+                stopped=time.monotonic();print('Native end of turn; no client response request',flush=True)
             elif kind=='response.output_audio_transcript.done':
-                index=len(spoken);spoken.append(e['transcript']);print('Question',index+1,'exact:',norm(e['transcript'])==norm(protocol[index]['q']),flush=True)
-                if norm(e['transcript'])!=norm(protocol[index]['q']):failure.append('Unexpected question: '+e['transcript'])
+                index=len(spoken);spoken.append(e['transcript']);print('Question',index+1,'exact:',norm(e['transcript'])==norm(protocol[index]),flush=True)
+                if norm(e['transcript'])!=norm(protocol[index]):failure.append('Unexpected question: '+e['transcript'])
             elif kind=='output_audio_buffer.stopped':
                 if len(spoken)>=3:done.set()
                 else:asyncio.get_running_loop().call_later(.7,lambda:setattr(speech,'buffer',audio))
@@ -64,7 +61,7 @@ async def main():
         call=None
         try:
             await peer.setLocalDescription(await peer.createOffer());call=await post('call',{'threadId':thread['id'],'sdp':peer.localDescription.sdp});await peer.setRemoteDescription(RTCSessionDescription(call['sdp'],'answer'))
-            await asyncio.wait_for(done.wait(),100);assert len(spoken)==3,(len(spoken),failure);assert not failure,failure;print('PASS: three exact protocol questions, two real audio answers, automatic silence.',flush=True)
+            await asyncio.wait_for(done.wait(),100);assert len(spoken)==3,(len(spoken),failure);assert not failure,failure;assert len(requested)==1;print('PASS: three exact protocol questions, two real audio answers, native automatic turns.',flush=True)
         finally:
             for t in timers:t.cancel()
             await peer.close()

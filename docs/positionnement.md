@@ -22,7 +22,7 @@ Elle peut aussi repartir avec une idée plus claire et ne rien vouloir faire de 
 
 ## Ce qui compte
 
-Le silence est un comportement du logiciel : attendre cinq secondes au début, puis trois secondes, et recommencer si la personne reprend la parole. Aucun bouton ni formule de commande à apprendre. La transcription écrite ne bloque jamais l’écoute ou la réponse.
+Les tours de parole sont gérés directement par OpenAI, qui détecte si la personne a fini son idée. Les attentes fixes de cinq puis trois secondes ont été retirées pour fiabiliser la conversation. Aucun bouton ni formule de commande à apprendre. La transcription écrite ne bloque jamais l’écoute ou la réponse.
 
 Les notes sont proposées puis relues, corrigées et conservées par la personne. Elles donnent une continuité aux séances sans fabriquer de dossier psychologique ni de tâches automatiques.
 

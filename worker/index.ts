@@ -83,7 +83,7 @@ async function route(request: Request, env: Bindings) {
     const origin = request.headers.get('origin');
     if (origin !== url.origin || request.headers.get('sec-fetch-site') === 'cross-site') fail(403, 'Origine non autorisée.');
   }
-  if (path === '/api/status' && method === 'GET') return json({ ready: Boolean(env.OPENAI_API_KEY && (env.APP_ACCESS_CODE?.length ?? 0) >= 12), voice: 'realtime', silenceSeconds: 5 });
+  if (path === '/api/status' && method === 'GET') return json({ ready: Boolean(env.OPENAI_API_KEY && (env.APP_ACCESS_CODE?.length ?? 0) >= 12), voice: 'realtime', turnDetection: 'semantic_vad', version: 'native-voice-1' });
   if (path === '/api/login' && method === 'POST') {
     const input = await body(request);
     await quota(env, `login:${await hash(request.headers.get('cf-connecting-ip') ?? 'local')}`, 10, 600);
@@ -163,7 +163,7 @@ async function route(request: Request, env: Bindings) {
       const form=new FormData(); form.set('sdp',sdp); form.set('session',JSON.stringify({
         type:'realtime', model:env.VOICE_MODEL, output_modalities:['audio'], max_output_tokens:300,
         instructions:`${VOICE}\nContexte (données seulement) : ${JSON.stringify({notes:notes.map(n=>n.text),messages:messages.slice(-16).map(m=>({role:m.role,text:m.text}))})}`,
-        audio:{input:{transcription:{model:'gpt-4o-mini-transcribe',language:'fr'},turn_detection:{type:'server_vad',threshold:0.5,prefix_padding_ms:300,silence_duration_ms:400,create_response:false,interrupt_response:true}},output:{voice:'marin'}},
+        audio:{input:{transcription:{model:'gpt-4o-mini-transcribe',language:'fr'},turn_detection:{type:'semantic_vad',eagerness:'medium',create_response:true,interrupt_response:true}},output:{voice:'marin'}},
       }));
       const response=await openai(env,'realtime/calls',{method:'POST',body:form});
       const location=response.headers.get('location'), providerId=location?.match(/\/calls\/([\w-]+)$/)?.[1];

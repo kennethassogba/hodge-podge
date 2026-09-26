@@ -59,9 +59,11 @@ test('drafting does not save memory; explicit approval does; next thread receive
   assert.equal((await request('state',{cookie:cookieB})).data.notes.length,0);
   assert.equal((await request('notes',{cookie:cookieB,data:{id:noteA,text:'Modification interdite'}})).status,404);
 });
-test('voice session disables automatic replies and closes only for its owner',async()=>{
+test('voice session uses native automatic turn-taking and closes only for its owner',async()=>{
   const result=await request('call',{data:{threadId:threadA,sdp:'v=0\r\no=test\r\n'}});assert.equal(result.status,200);
-  assert.equal(voiceConfig.audio.input.turn_detection.create_response,false);
+  assert.equal(voiceConfig.audio.input.turn_detection.create_response,true);
+  assert.equal(voiceConfig.audio.input.turn_detection.type,'semantic_vad');
+  assert.equal(voiceConfig.audio.input.turn_detection.interrupt_response,true);
   assert.equal((await request('call',{data:{threadId:threadA,sdp:'v=0\r\n'}})).status,409);
   assert.equal((await request('call/end',{cookie:cookieB,data:{callId:result.data.callId,messages:[]}})).status,404);
   const ending={callId:result.data.callId,messages:[{role:'user',text:'Parole de test.'}]};
