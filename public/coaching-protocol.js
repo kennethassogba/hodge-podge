@@ -16,20 +16,20 @@ export const QUESTIONS = [
   'Y a-t-il quelque chose que tu aurais aimé explorer dans cette bulle, ou que tu aimerais explorer à un autre moment ?',
 ];
 
-// English adaptation of the supplied French protocol; coach review is recommended.
+// Original English PDF supplied by the team, 24 September 2026; not a translation.
 export const QUESTIONS_EN = [
-  'Welcome to this bubble. This is time for you, and I’m here to listen. What would you like to talk about?',
+  'Welcome to this bubble. This is time for you, I am here to listen. What would you like to talk about?',
   'What questions are you asking yourself?',
-  'What do you need most right now?',
-  'Who have you already talked to about this?',
-  'Who would it make sense to talk to about this?',
-  'Who else is involved?',
+  'What do you need the most right now?',
+  'Who have you discussed this with?',
+  'Who would it make sense to discuss this with?',
+  'Who else is a stakeholder?',
   'Who else?',
-  'Are there any next steps you would like to set for yourself?',
-  'What would be a good time to do that?',
+  'Any next steps you’d like to give yourself?',
+  'When would be good timing to do so?',
   'What else?',
-  'Thank you for sharing. What are you taking away from this bubble?',
+  'Thanks for sharing. What are you coming out of this bubble with?',
   'What was most useful in this bubble — something I did, or something you did that was particularly useful?',
-  'What was less useful or less enjoyable?',
-  'Is there anything you would have liked to explore in this bubble, or that you would like to explore another time?',
+  'What was less useful or less pleasant?',
+  'Is there anything else you’d like to have explored in this bubble, or would like to explore at another time?',
 ];

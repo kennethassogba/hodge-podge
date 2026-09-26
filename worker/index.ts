@@ -85,7 +85,7 @@ async function route(request: Request, env: Bindings) {
     const origin = request.headers.get('origin');
     if (origin !== url.origin || request.headers.get('sec-fetch-site') === 'cross-site') fail(403, 'Origine non autorisée.');
   }
-  if (path === '/api/status' && method === 'GET') return json({ ready: Boolean(env.OPENAI_API_KEY && (env.APP_ACCESS_CODE?.length ?? 0) >= 12), voice: 'realtime', turnDetection: 'semantic_vad', version: '0.3.1' });
+  if (path === '/api/status' && method === 'GET') return json({ ready: Boolean(env.OPENAI_API_KEY && (env.APP_ACCESS_CODE?.length ?? 0) >= 12), voice: 'realtime', turnDetection: 'semantic_vad', version: '0.3.2' });
   if (path === '/api/login' && method === 'POST') {
     const input = await body(request);
     await quota(env, `login:${await hash(request.headers.get('cf-connecting-ip') ?? 'local')}`, 10, 600);
@@ -227,7 +227,7 @@ async function route(request: Request, env: Bindings) {
       const location=response.headers.get('location'), providerId=location?.match(/\/calls\/([\w-]+)$/)?.[1];
       const answer=await response.text(), callId=crypto.randomUUID();
       await env.DB.prepare('INSERT INTO calls(id,owner,thread_id,provider_id,created_at,language) VALUES(?,?,?,?,?,?)').bind(callId,user.id,threadId,providerId??null,now(),language(input.language)).run();
-      return json({sdp:answer,callId,maxSeconds:600,providerMaxSeconds:3600});
+      return json({sdp:answer,callId,maxSeconds:1200,providerMaxSeconds:3600});
     } finally { await env.DB.prepare('UPDATE visitors SET busy_until=0 WHERE id=?').bind(user.id).run(); }
   }
   if (path === '/api/call/end' && method === 'POST') {

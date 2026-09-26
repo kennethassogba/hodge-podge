@@ -20,12 +20,12 @@ Mise à jour : 26 septembre 2026.
 - [x] Correction et suppression des passages de transcription.
 - [x] Formulaire facultatif avec partage explicite et retrait possible.
 - [x] Tableau équipe protégé par un code distinct, sans accès aux conversations ni aux notes.
-- [x] Suppression des quotas quotidiens ; coupure à dix minutes rétablie en version 0.3.1.
+- [x] Suppression des quotas quotidiens ; coupure des appels portée à vingt minutes en version 0.3.2.
 - [x] Mentions de conservation précisant OpenAI et les sauvegardes Cloudflare.
 
 ## Ensuite, dans cet ordre
 
-1. **Séb : essayer une séance et relire l’adaptation anglaise.** Juger si les questions aident, si le rythme convient, si le coach impose une action. Noter les phrases précises à corriger.
+1. **Séb : essayer une séance et vérifier la fidélité au script anglais original.** Juger si les questions aident, si le rythme convient, si le coach impose une action. Noter les phrases précises à corriger.
 2. **Kenneth et Fano : vérifier sur leurs appareils.** Micro, casque, plusieurs réponses successives, silences, interruption, respect du script, notes puis nouvelle séance. Le résultat attendu est dans `silence.md`.
 3. **Inviter quelques testeurs et lire leurs retours dans /team.html, puis ajuster les prompts et le rythme.** Rejouer les scénarios concernés ; éviter d’ajouter une nouvelle intégration avant la démo.
 4. **Préparer et enregistrer la vidéo.** Séb joue un cas fictif ; un autre membre filme l’écran et contrôle le son. Montrer un échange vocal réel sans masquer les temps de réponse par le montage.

@@ -28,4 +28,4 @@ Le PDF Kedo du 24 septembre est une référence préexistante à déclarer, pas 
 - [OpenAI Realtime — VAD](https://developers.openai.com/api/docs/guides/realtime-vad) : détection de parole et `create_response`.
 - [Cloudflare Workers — prix](https://developers.cloudflare.com/workers/platform/pricing/) et [D1 — prix](https://developers.cloudflare.com/d1/platform/pricing/) : quotas gratuits et limites.
 
-Les attentes fixes ont été retirées après le bug navigateur : la fin de parole et la reprise sont désormais natives dans Realtime. Les quotas de consommation et le minuteur de dix minutes ont été retirés à la demande de l’équipe. Les tarifs et interfaces des fournisseurs peuvent évoluer ; leur documentation ne remplace pas une recette sur l’application.
+Les attentes fixes ont été retirées après le bug navigateur : la fin de parole et la reprise sont désormais natives dans Realtime. Les quotas de consommation ont été retirés à la demande de l’équipe. La coupure des appels est de vingt minutes depuis la version 0.3.2. Les tarifs et interfaces des fournisseurs peuvent évoluer ; leur documentation ne remplace pas une recette sur l’application.

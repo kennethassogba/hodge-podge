@@ -16,7 +16,7 @@ L’application utilise réellement OpenAI : aucun mode découverte ni réponse 
 4. Raccrocher, choisir **Garder quelques notes**, corriger la proposition puis **Conserver**.
 5. Ouvrir une **Nouvelle séance** : les notes conservées accompagnent le nouvel échange.
 
-Un casque est conseillé. L’appel s’arrête après dix minutes dans l’interface. Le navigateur doit rester ouvert. Le test de confort vocal avec Séb reste indispensable : les tests automatiques ne remplacent pas une conversation humaine.
+Un casque est conseillé. L’appel s’arrête après vingt minutes dans l’interface. Le navigateur doit rester ouvert. Le test de confort vocal avec Séb reste indispensable : les tests automatiques ne remplacent pas une conversation humaine.
 
 ## Développement local
 
@@ -81,9 +81,9 @@ Messages et appel WebRTC OpenAI, silences automatiques, reprise après interrupt
 
 L’agent vocal reçoit le fil récent et les notes approuvées. Realtime gère directement les tours de parole et les interruptions avec `semantic_vad`. Les 14 questions du PDF sont dans les instructions du modèle, qui doit les suivre dans l’ordre et mot pour mot, sauf demande explicite de répétition, explication, temps, passage de question, arrêt ou envie de passer à l’action. Le logiciel ne prétend ni lire un agenda ni envoyer un rappel. Notion, Telegram et les autres fournisseurs sont hors de cette version.
 
-## Version 0.3.1 : essais en français et anglais
+## Version 0.3.2 : essais en français et anglais
 
-- Choix FR/EN avant l’appel : interface, protocole, voix, transcription et brouillons de notes. Les notes et échanges existants ne sont pas traduits automatiquement. L’adaptation anglaise est dans `public/coaching-protocol.js` et reste à relire avec Séb.
+- Choix FR/EN avant l’appel : interface, protocole, voix, transcription et brouillons de notes. Les notes et échanges existants ne sont pas traduits automatiquement. Les deux scripts originaux Kedo (FR et EN, 24 septembre 2026) sont dans `public/coaching-protocol.js`.
 - Filtrage OpenAI `far_field` pour micro intégré et `near_field` pour casque, en complément des traitements du navigateur. Une consigne privilégie le français de France et évite de répondre aux conversations lointaines. Cela ne garantit pas une immunité au bruit ni un accent parfait.
 - Après l’appel, retour facultatif : clarté gagnée et qualité ressentie de 0 à 10, commentaire optionnel, case de partage non cochée. Modifier ou retirer un retour depuis la séance ; aucun questionnaire oral ajouté au coaching.
 - Les passages de transcription utilisateur sont corrigeables et supprimables avant préparation des notes. Les notes déjà approuvées restent à modifier séparément.
@@ -98,7 +98,7 @@ Le code administrateur de cette installation est dans `.dev.vars.admin`, ignoré
 - Un espace est lié à un cookie de navigateur et expire après 30 jours ; une purge quotidienne supprime ensuite ses données. Perdre le cookie fait perdre l’accès : pas de compte ni de synchronisation entre appareils.
 - Seules les notes validées passent automatiquement d’une séance à l’autre. Dans une séance, le modèle reçoit au plus les 40 derniers messages ; la voix reçoit au plus les huit derniers messages écrits par la personne, sans anciennes questions de coaching. Maximum 20 notes.
 - Les transcriptions d’appel sont sauvegardées à la fin. En cas d’échec, laisser la page ouverte pour réessayer. Fermer brutalement peut perdre la transcription.
-- Aucun quota applicatif de messages, notes proposées ou appels et coupure automatique après dix minutes dans le navigateur. OpenAI limite une session Realtime à 60 minutes ; ses limites de débit/crédit et les capacités Cloudflare continuent de s’appliquer. Les tentatives de connexion restent limitées contre le bruteforce. Un seul appel simultané par espace.
+- Aucun quota applicatif de messages, notes proposées ou appels et coupure automatique après vingt minutes dans le navigateur. OpenAI limite une session Realtime à 60 minutes ; ses limites de débit/crédit et les capacités Cloudflare continuent de s’appliquer. Les tentatives de connexion restent limitées contre le bruteforce. Un seul appel simultané par espace.
 - Effacer l’espace supprime la base active, pas instantanément les journaux des fournisseurs. OpenAI : pas d’entraînement par défaut sauf partage volontaire ; journaux de surveillance des abus jusqu’à 30 jours avec exceptions. `store: false` pour les réponses texte ne signifie pas Zero Data Retention. D1 Time Travel : 7 jours en Free, 30 en Paid. Ces règles sont expliquées dans l’interface et dans [le guide des essais](docs/essais.md).
 - Le code partagé protège un petit essai d’équipe ; ce prototype n’a pas une authentification de produit public. Ne pas publier ce code d’accès.
 

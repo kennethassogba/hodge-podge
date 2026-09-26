@@ -1,5 +1,5 @@
-import { QUESTIONS, QUESTIONS_EN } from './coaching-protocol.js?v=0.3.1';
-import { t, getLanguage, initLanguage, setLanguage } from './i18n.js?v=0.3.1';
+import { QUESTIONS, QUESTIONS_EN } from './coaching-protocol.js?v=0.3.2';
+import { t, getLanguage, initLanguage, setLanguage } from './i18n.js?v=0.3.2';
 initLanguage(document);
 
 const $ = id => document.getElementById(id);
@@ -169,8 +169,8 @@ async function startCall(){
     c.channel.onmessage=e=>{try{handleEvent(c,JSON.parse(e.data));}catch{void endCall(t('La connexion vocale a rencontré un problème. Tu peux relancer l’appel.'));}};
     c.channel.onopen=()=>{
       if(call!==c)return;clearTimeout(c.connectionTimer);c.started=Date.now();callStatus(c,t('Le coach prépare sa réponse…'));
-      c.limitTimer=setTimeout(()=>{if(call===c)void endCall(t('Les dix minutes sont écoulées. Tu peux garder quelques notes.'),'ended');},600000);
-      c.ticker=setInterval(()=>{const seconds=Math.floor((Date.now()-c.started)/1000);$('call-time').textContent=`${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`;if(seconds>=600)void endCall(t('Les dix minutes sont écoulées. Tu peux garder quelques notes.'),'ended');},1000);
+      c.limitTimer=setTimeout(()=>{if(call===c)void endCall(t('Les vingt minutes sont écoulées. Tu peux garder quelques notes.'),'ended');},1200000);
+      c.ticker=setInterval(()=>{const seconds=Math.floor((Date.now()-c.started)/1000);$('call-time').textContent=`${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`;if(seconds>=1200)void endCall(t('Les vingt minutes sont écoulées. Tu peux garder quelques notes.'),'ended');},1000);
       // Native VAD creates all later responses; the client only requests the greeting.
       const greeting=(getLanguage()==='en'?QUESTIONS_EN:QUESTIONS)[0];
       send(c,{type:'response.create',response:{instructions:`This is a new coaching call. Say only this exact opening, without introduction or extra words: ${greeting}`}});

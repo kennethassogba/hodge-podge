@@ -1,4 +1,4 @@
-# Essais — version 0.3.1
+# Essais — version 0.3.2
 
 ## Partager l’application
 
@@ -10,7 +10,7 @@ Choisir Français ou English avant de parler. Sélectionner micro intégré ou c
 
 ## Protocole
 
-Les 14 questions françaises du PDF restent la référence. L’anglais est une adaptation relisible dans public/coaching-protocol.js. Respecter un souhait explicite de passer une question, de terminer, de passer à l’action ou de ne pas faire le débrief. Ne pas confondre terminer la conversation oralement avec raccrocher techniquement : la personne garde le bouton Raccrocher.
+Chaque langue suit les 14 questions de son PDF original Kedo du 24 septembre 2026, reprises dans public/coaching-protocol.js. Respecter un souhait explicite de passer une question, de terminer, de passer à l’action ou de ne pas faire le débrief. Ne pas confondre terminer la conversation oralement avec raccrocher techniquement : la personne garde le bouton Raccrocher.
 
 ## Avis et mesures
 
@@ -32,13 +32,13 @@ Sources consultées le 26 septembre 2026 : [OpenAI — données](https://develop
 
 ## Consommation
 
-Aucun quota applicatif quotidien pour les appels, le texte ou les notes proposées, coupure automatique après dix minutes dans le navigateur. OpenAI impose toujours sa durée maximale de session de 60 minutes et ses limites de crédit/débit. Les protections contre les tentatives répétées de connexion et les connexions bloquées sont conservées. Aucun abonnement Cloudflare payant n’a été ajouté.
+Aucun quota applicatif quotidien pour les appels, le texte ou les notes proposées, coupure automatique après vingt minutes dans le navigateur. OpenAI impose toujours sa durée maximale de session de 60 minutes et ses limites de crédit/débit. Les protections contre les tentatives répétées de connexion et les connexions bloquées sont conservées. Aucun abonnement Cloudflare payant n’a été ajouté.
 
 ## Administration
 
 Ouvrir /team.html ou le lien « Espace équipe » en pied de page. Utiliser ADMIN_ACCESS_CODE dans le fichier local .dev.vars.admin, et non le code destiné aux testeurs. Le code administrateur a été installé sur Cloudflare avec l’accord explicite de Kenneth. Il est réservé à Kenneth, Séb et Fano.
 
-La coupure à dix minutes ferme le micro et le transport, sauvegarde le fil et propose le retour facultatif. C’est une fin normale, pas une erreur dans les statistiques. Elle dépend de l’exécution du navigateur ; elle n’est pas un plafond financier côté serveur.
+La coupure à vingt minutes ferme le micro et le transport, sauvegarde le fil et propose le retour facultatif. C’est une fin normale, pas une erreur dans les statistiques. Elle dépend de l’exécution du navigateur ; elle n’est pas un plafond financier côté serveur.
 
 ## Changement d’adresse du 26 septembre 2026
 
