@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f4f3ed"><meta name="description" content="Un espace pour parler, prendre le temps de réfléchir et retrouver le fil. Hodge Podge, projet de hackathon X-IA.">
+  <title>La Bulle — Hodge Podge</title>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#message">Aller à la conversation</a>
+  <header class="masthead">
+    <a href="/" class="brand" aria-label="La Bulle, accueil"><span class="brand-symbol" aria-hidden="true">b.</span><span>la bulle<span class="byline">par Hodge Podge</span></span></a>
+    <button class="quiet" id="about-button">À propos</button>
+  </header>
+  <main class="workspace">
+    <aside class="sidebar">
+      <p class="side-intro">Un peu de place<br>pour y voir plus clair.</p>
+      <button class="new-thread" id="new-thread"><span aria-hidden="true">＋</span> Nouvelle séance</button>
+      <h2 class="small-heading">Nos échanges</h2>
+      <nav id="threads" aria-label="Séances précédentes"><p class="muted small">Ton premier échange commence ici.</p></nav>
+      <div class="sidebar-bottom"><span class="little-dot" aria-hidden="true"></span><span>À ton rythme.</span></div>
+    </aside>
+    <section class="conversation" aria-label="Conversation avec le coach">
+      <header class="conversation-head">
+        <div><h1>Ton espace pour parler</h1><p id="mode-label">Un coach IA, du temps pour réfléchir.</p></div>
+        <button id="call-button" class="primary"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3 4 4c-2 6 7 15 13 16l3-3-5-4-2 2-4-4 2-2Z"/></svg><span>Appeler</span></button>
+      </header>
+      <div id="error" class="error-banner" role="alert" hidden></div>
+      <section id="call-panel" class="call-panel" aria-label="Appel vocal" hidden>
+        <div class="call-top"><span id="call-kind">Conversation vocale</span><span id="call-time">00:00</span></div>
+        <div class="voice-mark" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+        <h2 id="call-status" aria-live="polite">Connexion…</h2>
+        <p id="call-hint">Prends ton temps. Tu n’as rien à préparer.</p>
+        <div class="call-actions"><button id="hold-button" class="secondary" aria-pressed="false">Je réfléchis</button><button id="floor-button" class="secondary">À toi</button><button id="mute-button" class="quiet" aria-pressed="false">Couper le micro</button><button id="hangup-button" class="danger">Raccrocher</button></div>
+        <p class="small muted">« Je réfléchis » suspend les relances jusqu’à « À toi ». L’appel s’arrête après 10 minutes.</p>
+      </section>
+      <div class="feed" id="feed" role="log" aria-label="Messages" aria-live="polite">
+        <div class="welcome" id="welcome">
+          <p class="welcome-kicker">Bienvenue dans ta bulle.</p>
+          <h2>Qu’est-ce qui<br>t’occupe l’esprit ?</h2>
+          <p>Un échange à préparer, une décision à démêler,<br class="desktop-break"> ou simplement besoin d’en parler. On prend le temps.</p>
+          <div class="suggestions"><button data-prompt="J’ai un échange difficile à préparer.">Préparer un échange <span aria-hidden="true">↗</span></button><button data-prompt="J’ai du mal à prendre une décision.">Y voir plus clair <span aria-hidden="true">↗</span></button><button data-prompt="J’ai surtout besoin de poser les choses.">Poser les choses <span aria-hidden="true">↗</span></button></div>
+        </div>
+        <div id="messages"></div>
+        <p id="typing" class="typing" hidden>Le coach prend un instant…</p>
+      </div>
+      <form id="composer" class="composer">
+        <label for="message" class="sr-only">Ton message</label>
+        <textarea id="message" rows="2" maxlength="6000" placeholder="Écris ce qui te vient…"></textarea>
+        <button type="submit" id="send-button" class="send" aria-label="Envoyer le message">↑</button>
+      </form>
+      <div class="composer-footer"><span>Tu peux aussi en parler de vive voix.</span><button id="draft-button" class="text-button">Garder quelques notes</button></div>
+    </section>
+    <aside class="notes-panel" aria-label="Notes conservées">
+      <div class="notes-title"><h2>Ce que je garde</h2><button id="add-note" class="quiet icon-button" aria-label="Ajouter une note">＋</button></div>
+      <p class="muted small">Tes mots, pour retrouver le fil.<br>Rien n’est ajouté sans ton accord.</p>
+      <div id="notes"></div>
+      <div class="note-empty" id="note-empty"><span aria-hidden="true">“</span><p>Une pensée à garder ?<br>Elle trouvera sa place ici.</p></div>
+      <details class="privacy"><summary>Où restent mes échanges ?</summary><p>Le fil et les transcriptions sont conservés 30 jours sur le serveur, dans l’espace de ce navigateur. Les notes approuvées servent de mémoire au coach. L’audio brut n’est pas enregistré par cette application. Les échanges sont transmis à OpenAI.</p><button id="erase-button" class="text-button">Effacer mon espace</button></details>
+      <details class="technical"><summary>Pour la démo du hackathon</summary><p class="small muted">Choix de conversation du modèle texte, sans raisonnement interne.</p><ul id="decisions"></ul></details>
+    </aside>
+  </main>
+  <footer class="footer"><span>Hodge Podge · X-IA Hackathon 2026</span><span>Une conversation. Pas une course.</span></footer>
+  <dialog id="access-dialog"><form id="access-form"><p class="dialog-kicker">Bienvenue</p><h2>Ouvrir ta bulle</h2><p>Entre le code d’accès de l’équipe. Chaque navigateur garde son propre espace.</p><label for="access-code">Code d’accès</label><input id="access-code" type="password" autocomplete="current-password" required maxlength="200"><p id="access-error" class="form-error" role="alert"></p><div class="dialog-actions"><button type="button" data-close="access-dialog" class="quiet">Annuler</button><button type="submit" class="primary" id="access-submit">Entrer</button></div><p class="small muted" id="config-hint"></p></form></dialog>
+  <dialog id="note-dialog"><form id="note-form"><p class="dialog-kicker">À relire, avec tes mots</p><h2>Ce que tu veux garder</h2><p>Modifie librement cette note. Elle sera partagée avec le coach lors des prochaines séances.</p><label for="note-text">Ta note</label><textarea id="note-text" rows="6" maxlength="2500" required></textarea><p id="note-error" class="form-error" role="alert"></p><div class="dialog-actions"><button type="button" data-close="note-dialog" class="quiet">Ne pas garder</button><button type="submit" id="note-save" class="primary">Conserver</button></div></form></dialog>
+  <dialog id="about-dialog"><h2>Un peu d’espace pour penser.</h2><p>La Bulle est un projet de Hodge Podge : Séb, Fano et Kenneth, pour le hackathon X-IA. Tu échanges avec une IA, pas avec Séb.</p><p>Une question à la fois, des silences qui ont leur place et des notes que tu choisis de conserver. Ce prototype accompagne une réflexion professionnelle ; il ne remplace pas un accompagnement médical.</p><p>Pour l’appel : garde cette page ouverte et autorise le micro. Un casque est conseillé. </p><button data-close="about-dialog" class="primary">C’est compris</button></dialog>
+  <dialog id="confirm-dialog"><h2 id="confirm-title">Confirmer</h2><p id="confirm-description"></p><div class="dialog-actions"><button id="confirm-no" class="quiet">Annuler</button><button id="confirm-yes" class="danger">Effacer</button></div></dialog>
+</body>
+</html>

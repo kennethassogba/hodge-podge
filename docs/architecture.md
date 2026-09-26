@@ -1,0 +1,44 @@
+# Architecture de la version web
+
+## Les composants
+
+```mermaid
+flowchart LR
+    U[Navigateur : messages, micro, notes] --> W[Worker Cloudflare : accès et orchestration]
+    W --> D[(D1 : séances et notes)]
+    W --> R[OpenAI Responses : coach texte et notes]
+    W --> S[OpenAI Realtime : ouverture de session]
+    U <-->|WebRTC : audio et événements| S
+```
+
+Le frontend est en HTML/CSS/JavaScript, sans framework. Un Worker TypeScript sert l’API et les fichiers statiques. Le secret OpenAI reste dans le Worker. Le navigateur échange son offre SDP contre une réponse SDP via le serveur, puis communique directement avec Realtime.
+
+## La logique d’agent
+
+Pour chaque message, le serveur retrouve le fil et les notes approuvées. Le LLM choisit une intention de conversation — clarifier, reformuler, explorer ou clôturer — et formule sa réponse dans un schéma JSON vérifié. Le choix et la réponse sont enregistrés. Il n’y a pas de questionnaire à embranchements fixes ni de réponses préécrites.
+
+En vocal, Realtime adapte la conversation au contexte. La détection vocale ne déclenche jamais seule une réponse (`create_response: false`). Le contrôleur de tours autorise `response.create` après le silence protégé ou une commande explicite. Les décisions texte affichées ne sont pas une trace du raisonnement interne ni une analyse de la séance vocale.
+
+Sur demande, une seconde tâche LLM propose les notes de fin de séance. Cette proposition ne modifie pas la mémoire. Seul **Conserver** écrit une note qui sera disponible lors des prochaines séances. Le projet utilise deux tâches LLM coordonnées, pas une collection artificielle d’agents autonomes.
+
+## Modèles
+
+- `gpt-4.1-mini` : messages et propositions de notes via Responses, `store: false`.
+- `gpt-realtime-2.1` : conversation audio WebRTC ; voix `marin`.
+- `gpt-4o-mini-transcribe` : transcription de la parole, langue française.
+
+Les noms texte et voix se changent dans `wrangler.jsonc`. L’accès à ces modèles a été confirmé pour le compte de l’équipe.
+
+## Données et accès
+
+D1 contient visiteurs, séances, messages, notes, choix de conversation, compteurs et métadonnées d’appels. Le code d’équipe ouvre un espace distinct par navigateur. Le serveur vérifie le propriétaire à chaque accès. Le cookie est HttpOnly, SameSite Strict et Secure sous HTTPS ; son empreinte est stockée en base.
+
+La session expire après 30 jours ; la purge quotidienne efface les données associées par cascade. L’utilisateur peut effacer son espace immédiatement. Les notes passent d’une séance à l’autre ; les transcriptions complètes des autres séances ne sont pas injectées automatiquement.
+
+L’audio brut n’est pas enregistré par notre application. Le transport audio passe par OpenAI ; la rétention du fournisseur est distincte. Ne pas confondre `store: false` et absence universelle de traitement ou de conservation chez le fournisseur.
+
+## Limites de cette première version
+
+Pas de compte multiappareil, agenda, notifications ni Notion. L’appel nécessite HTTPS ou localhost. La clôture tente de raccrocher côté OpenAI puis sauvegarde les transcriptions reçues ; une page fermée brutalement peut les perdre. Les réponses interrompues sont exclues de la transcription enregistrée pour ne pas conserver comme entendue leur partie non jouée.
+
+Le minuteur de dix minutes est dans le navigateur. Les quotas serveur limitent les ouvertures et demandes, mais ne garantissent pas un plafond de dépense. Le code partagé et ces quotas sont adaptés à un petit essai d’équipe, pas à une ouverture publique sans contrôle.

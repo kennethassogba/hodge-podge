@@ -1,0 +1,4 @@
+# Copiez ce fichier en .dev.vars. Ne partagez jamais .dev.vars.
+OPENAI_API_KEY=
+# Choisissez au moins 12 caractères. Ce code ouvre les essais de l'équipe.
+APP_ACCESS_CODE=
