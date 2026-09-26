@@ -20,7 +20,7 @@ Mise à jour : 26 septembre 2026.
 - [x] Correction et suppression des passages de transcription.
 - [x] Formulaire facultatif avec partage explicite et retrait possible.
 - [x] Tableau équipe protégé par un code distinct, sans accès aux conversations ni aux notes.
-- [x] Suppression des quotas de consommation et de la coupure à dix minutes.
+- [x] Suppression des quotas quotidiens ; coupure à dix minutes rétablie en version 0.3.1.
 - [x] Mentions de conservation précisant OpenAI et les sauvegardes Cloudflare.
 
 ## Ensuite, dans cet ordre

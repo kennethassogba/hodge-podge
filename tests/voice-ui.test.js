@@ -83,7 +83,7 @@ test('English interface sends language and microphone choice, and feedback remai
     assert.equal(s.http.find(r=>r.path==='/api/call').data.language,'en');
     assert.equal(s.http.find(r=>r.path==='/api/call').data.microphone,'speaker');
     assert.equal(s.document.getElementById('language').disabled,true);
-    s.question(0);s.tick(11*60*1000);assert.equal(s.document.getElementById('call-panel').hidden,false);
+    s.question(0);s.tick(9*60*1000);assert.equal(s.document.getElementById('call-panel').hidden,false);
     s.document.getElementById('hangup-button').click();await s.settle();
     assert.equal(s.document.getElementById('feedback-panel').hidden,false);
     assert.equal(s.document.getElementById('feedback-dialog').open,false);
@@ -99,5 +99,22 @@ test('English interface sends language and microphone choice, and feedback remai
     assert.equal(s.document.getElementById('feedback-button').textContent,'Edit my feedback');
     const select=s.document.getElementById('language');select.value='fr';select.dispatchEvent(new s.window.Event('change'));
     assert.equal(s.document.querySelector('h1').textContent,'Ton espace pour parler');assert.equal(s.document.getElementById('feedback-button').textContent,'Modifier mon retour');
+  }finally{s.close();}
+});
+
+test('calls end at ten minutes, save the transcript, and count as normal endings',async()=>{
+  const s=await setup();try{
+    s.question(0);
+    s.emit({type:'input_audio_buffer.speech_started',item_id:'timeout-user'});
+    s.emit({type:'conversation.item.input_audio_transcription.completed',item_id:'timeout-user',transcript:'Je veux clarifier mes priorités.'});
+    s.emit({type:'input_audio_buffer.speech_stopped',item_id:'timeout-user'});s.question(1);
+    s.tick(599000);await s.settle();assert.equal(s.document.getElementById('call-panel').hidden,false);
+    s.tick(1000);await s.settle();assert.equal(s.document.getElementById('call-panel').hidden,true);
+    assert.equal(s.track.stopped,true);assert.equal(s.document.getElementById('call-button').disabled,false);
+    const ending=s.http.find(r=>r.path==='/api/call/end').data;
+    assert.equal(ending.outcome,'ended');assert.ok(ending.messages.some(m=>m.text==='Je veux clarifier mes priorités.'));
+    assert.match(s.document.getElementById('error').textContent,/dix minutes/);
+    assert.equal(s.document.getElementById('error').dataset.tone,'info');
+    assert.equal(s.document.getElementById('decisions'),null);assert.equal(s.document.getElementById('mode-label'),null);
   }finally{s.close();}
 });

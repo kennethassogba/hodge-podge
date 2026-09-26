@@ -1,4 +1,6 @@
 export const EN = {
+  'Les dix minutes sont écoulées. Tu peux garder quelques notes.':'The ten minutes are up. You can keep a few notes.',
+  'Prends le temps de répondre. L’appel se termine automatiquement après 10 minutes.':'Take your time to answer. The call ends automatically after 10 minutes.',
   'Appel':'Call',
   'Retour au coach':'Back to the coach', 'Les retours sur La Bulle':'Feedback on La Bulle', 'Les avis partagés volontairement et les statistiques techniques. Aucun échange ni aucune note personnelle dans ce tableau.':'Voluntarily shared feedback and technical statistics. No conversations or personal notes are shown in this dashboard.',
   'Code administrateur':'Administrator code', 'Actualiser':'Refresh', 'Se déconnecter':'Sign out', 'Les chiffres portent sur les espaces non expirés. Un espace effacé retire aussi ses retours et ses statistiques.':'Figures cover spaces that have not expired. Deleting a space also removes its feedback and statistics.',

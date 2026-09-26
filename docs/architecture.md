@@ -45,4 +45,4 @@ L’audio brut n’est pas enregistré par notre application. Le transport audio
 
 Pas de compte multiappareil, agenda, notifications ni Notion. L’appel nécessite HTTPS ou localhost. La clôture tente de raccrocher côté OpenAI puis sauvegarde les transcriptions reçues ; une page fermée brutalement peut les perdre. Les réponses interrompues sont exclues de la transcription enregistrée pour ne pas conserver comme entendue leur partie non jouée.
 
-Les quotas de messages, notes proposées et appels ainsi que le minuteur de dix minutes ont été retirés. Une session Realtime reste limitée à 60 minutes par OpenAI. Les garde-fous de connexion, l’isolation des espaces et la limitation des tentatives de connexion demeurent. Le code partagé est destiné aux essais privés.
+Les quotas de messages, notes proposées et appels ont été retirés ; la coupure à dix minutes a été rétablie en version 0.3.1. Une session Realtime reste limitée à 60 minutes par OpenAI. Les garde-fous de connexion, l’isolation des espaces et la limitation des tentatives de connexion demeurent. Le code partagé est destiné aux essais privés.

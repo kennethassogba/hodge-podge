@@ -1,4 +1,4 @@
-# Essais — version 0.3.0
+# Essais — version 0.3.1
 
 ## Partager l’application
 
@@ -32,4 +32,10 @@ Sources consultées le 26 septembre 2026 : [OpenAI — données](https://develop
 
 ## Consommation
 
-Aucun quota applicatif quotidien pour les appels, le texte ou les notes proposées, aucune coupure à dix minutes. OpenAI impose toujours sa durée maximale de session de 60 minutes et ses limites de crédit/débit. Les protections contre les tentatives répétées de connexion et les connexions bloquées sont conservées. Aucun abonnement Cloudflare payant n’a été ajouté.
+Aucun quota applicatif quotidien pour les appels, le texte ou les notes proposées, coupure automatique après dix minutes dans le navigateur. OpenAI impose toujours sa durée maximale de session de 60 minutes et ses limites de crédit/débit. Les protections contre les tentatives répétées de connexion et les connexions bloquées sont conservées. Aucun abonnement Cloudflare payant n’a été ajouté.
+
+## Administration
+
+Ouvrir /team.html ou le lien « Espace équipe » en pied de page. Utiliser ADMIN_ACCESS_CODE dans le fichier local .dev.vars.admin, et non le code destiné aux testeurs. Le code administrateur a été installé sur Cloudflare avec l’accord explicite de Kenneth. Il est réservé à Kenneth, Séb et Fano.
+
+La coupure à dix minutes ferme le micro et le transport, sauvegarde le fil et propose le retour facultatif. C’est une fin normale, pas une erreur dans les statistiques. Elle dépend de l’exécution du navigateur ; elle n’est pas un plafond financier côté serveur.

@@ -74,7 +74,7 @@ test('voice session uses native automatic turn-taking and closes only for its ow
 test('English prompts, transcription language, noise reduction and unrestricted call count',async()=>{
   for(let i=0;i<14;i++){
     const r=await request('call',{data:{threadId:threadA,sdp:'v=0\r\n',language:'en',microphone:'headset'}});assert.equal(r.status,200);
-    assert.equal(r.data.maxSeconds,undefined);assert.equal(voiceConfig.audio.input.transcription.language,'en');
+    assert.equal(r.data.maxSeconds,600);assert.equal(voiceConfig.audio.input.transcription.language,'en');
     assert.equal(voiceConfig.audio.input.transcription.model,'gpt-4o-transcribe');
     assert.equal(voiceConfig.audio.input.noise_reduction.type,'near_field');assert.match(voiceConfig.instructions,/Welcome to this bubble/);assert.doesNotMatch(voiceConfig.instructions,/Parle français/);
     await request('call/end',{data:{callId:r.data.callId,messages:[],durationSeconds:900,interruptions:2,outcome:'ended'}});

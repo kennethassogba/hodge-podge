@@ -1,5 +1,5 @@
-import { QUESTIONS, QUESTIONS_EN } from './coaching-protocol.js?v=0.3.0';
-import { t, getLanguage, initLanguage, setLanguage } from './i18n.js?v=0.3.0';
+import { QUESTIONS, QUESTIONS_EN } from './coaching-protocol.js?v=0.3.1';
+import { t, getLanguage, initLanguage, setLanguage } from './i18n.js?v=0.3.1';
 initLanguage(document);
 
 const $ = id => document.getElementById(id);
@@ -52,9 +52,6 @@ function render() {
     actions.append(edit,remove);card.append(actions);return card;
   }));
   $('note-empty').hidden=state.notes.length>0;
-  $('decisions').replaceChildren(...state.decisions.map(d=>node('li','',`${date(d.created_at)} · ${t(d.action)}`)));
-  if(!state.decisions.length)$('decisions').append(node('li','',t('Les choix apparaîtront après un message.')));
-  $('mode-label').textContent=authenticated ? t('Coach IA · tes silences ont leur place.') : t('Un coach IA, du temps pour réfléchir.');
   renderFeedback();
   updateControls();
 }
@@ -172,7 +169,8 @@ async function startCall(){
     c.channel.onmessage=e=>{try{handleEvent(c,JSON.parse(e.data));}catch{void endCall(t('La connexion vocale a rencontré un problème. Tu peux relancer l’appel.'));}};
     c.channel.onopen=()=>{
       if(call!==c)return;clearTimeout(c.connectionTimer);c.started=Date.now();callStatus(c,t('Le coach prépare sa réponse…'));
-      c.ticker=setInterval(()=>{const seconds=Math.floor((Date.now()-c.started)/1000);$('call-time').textContent=`${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`;},1000);
+      c.limitTimer=setTimeout(()=>{if(call===c)void endCall(t('Les dix minutes sont écoulées. Tu peux garder quelques notes.'),'ended');},600000);
+      c.ticker=setInterval(()=>{const seconds=Math.floor((Date.now()-c.started)/1000);$('call-time').textContent=`${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`;if(seconds>=600)void endCall(t('Les dix minutes sont écoulées. Tu peux garder quelques notes.'),'ended');},1000);
       // Native VAD creates all later responses; the client only requests the greeting.
       const greeting=(getLanguage()==='en'?QUESTIONS_EN:QUESTIONS)[0];
       send(c,{type:'response.create',response:{instructions:`This is a new coaching call. Say only this exact opening, without introduction or extra words: ${greeting}`}});
@@ -192,16 +190,16 @@ async function saveCall(){
   if(!pendingSave)return;
   await api('call/end',pendingSave);pendingSave=null;await load();updateControls();
 }
-async function endCall(message=''){
+async function endCall(message='',outcome=message?'error':'ended'){
   const c=call;if(!c||c.ending)return;c.ending=true;
-  clearInterval(c.ticker);clearTimeout(c.connectionTimer);clearTimeout(c.responseTimer);
+  clearInterval(c.ticker);clearTimeout(c.limitTimer);clearTimeout(c.connectionTimer);clearTimeout(c.responseTimer);
   // Reset the UI first. A failed transport cleanup must never leave the call stuck.
   call=null;$('call-panel').hidden=true;
   for(const cleanup of [()=>c.stream?.getTracks().forEach(t=>t.stop()),()=>c.channel?.close(),()=>c.peer.close(),()=>c.audio.pause(),()=>{c.audio.srcObject=null;}]){try{cleanup();}catch{}}
   const messages=[...c.transcript.values()].sort((a,b)=>a.order-b.order).filter(m=>m.text.trim()&&!m.interrupted).map(m=>({role:m.role,text:m.text}));
   if(c.callId)feedbackChoice=c.callId;
-  if(c.callId)pendingSave={callId:c.callId,messages,durationSeconds:c.started?Math.floor((Date.now()-c.started)/1000):0,interruptions:c.interruptions,transcriptionFailures:c.transcriptionFailures,outcome:message?'error':'ended'};
-  try{await saveCall();if(message)error(message);else if(messages.length)error(t('Appel terminé. Tu peux relire le fil et choisir « Garder quelques notes ».'),'info');}
+  if(c.callId)pendingSave={callId:c.callId,messages,durationSeconds:c.started?Math.floor((Date.now()-c.started)/1000):0,interruptions:c.interruptions,transcriptionFailures:c.transcriptionFailures,outcome};
+  try{await saveCall();if(message)error(message,outcome==='ended'?'info':'error');else if(messages.length)error(t('Appel terminé. Tu peux relire le fil et choisir « Garder quelques notes ».'),'info');}
   catch{error(t('La transcription n’a pas encore été sauvegardée. Garde cette page ouverte et utilise « Réessayer la sauvegarde ».'));}
   render();if(pendingSave){const retry=node('button','text-button',t('Réessayer la sauvegarde'));retry.onclick=()=>guard(async()=>{await saveCall();error();render();});$('error').append(retry);}scrollFeed();
 }
