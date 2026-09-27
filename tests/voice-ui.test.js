@@ -7,12 +7,13 @@ import { JSDOM } from 'jsdom';
 import { QUESTIONS } from '../public/coaching-protocol.js';
 
 // Run the actual UI handlers against fake transport events, not a second implementation.
-async function setup({cleanupThrows=false,language='fr',url='https://test.example',signedIn=true,autoCall=true,saveFails=false}={}){
+async function setup({cleanupThrows=false,language='fr',url='https://test.example',signedIn=true,autoCall=true,saveFails=false,saveErrors=[],refreshErrors=[]}={}){
   const dom=new JSDOM(await readFile('public/index.html','utf8'),{url});
   dom.window.localStorage.setItem('hp_language',language);
   const document=dom.window.document;
   dom.window.HTMLDialogElement.prototype.showModal=function(){this.open=true;};dom.window.HTMLDialogElement.prototype.close=function(){this.open=false;};document.getElementById('feed').scrollTo=()=>{};
-  let authenticated=signedIn;
+  let authenticated=signedIn,didSave=false;
+  if(saveFails)saveErrors=[500,500,500];
   let peer,clock=0,seq=0;const timers=new Map(),sent=[],http=[],tickers=[];
   const uiState={threadId:'fake-thread',threads:[{id:'fake-thread',created_at:Date.now()}],messages:[],notes:[],decisions:[],calls:[]};
   function validTimerReceiver(receiver){if(receiver && receiver!==dom.window && !receiver.document)throw new TypeError('Illegal invocation');}
@@ -26,14 +27,18 @@ async function setup({cleanupThrows=false,language='fr',url='https://test.exampl
   }
   const track={stopped:false,stop(){this.stopped=true;},enabled:true};
   const context=vm.createContext({document,window:dom.window,navigator:{onLine:true,mediaDevices:{getUserMedia:async()=>({getTracks:()=>[track],getAudioTracks:()=>[track]})}},
-    RTCPeerConnection:Peer,Audio:class{constructor(){this.muted=false;}async play(){}pause(){}},crypto,
+    AbortController,RTCPeerConnection:Peer,Audio:class{constructor(){this.muted=false;}async play(){}pause(){}},crypto,
     setTimeout:setTimer,clearTimeout:clearTimer,setInterval:fn=>{tickers.push(fn);return tickers.length;},clearInterval:()=>{},console,
     fetch:async (path,options)=>{
       const data=options?.body?JSON.parse(options.body):null;http.push({path,data});
       if(path==='/api/login'){if(data.code==='valid-passphrase')authenticated=true;else return Response.json({error:'Ce code d’accès ne correspond pas.'},{status:401});}
       if(path.startsWith('/api/state')&&!authenticated)return Response.json({error:'Code required'},{status:401});
-      if(path==='/api/call/end'&&saveFails){saveFails=false;return Response.json({error:'test failure'},{status:500});}
-      if(path==='/api/call/end')uiState.calls=[{id:'fake-call-id',ended_at:Date.now(),language,feedback_submitted:0}];
+      const fault=path==='/api/call/end'?saveErrors.shift():path.startsWith('/api/state')&&didSave?refreshErrors.shift():null;
+      if(fault==='network'){const error=new Error('Network unavailable');error.name='TypeError';throw error;}
+      if(fault==='timeout')return new Promise((resolve,reject)=>options.signal.addEventListener('abort',()=>{const error=new Error('Aborted');error.name='AbortError';reject(error);},{once:true}));
+      if(fault==='html')return new Response('<html>Unavailable</html>',{status:503});
+      if(fault)return Response.json({error:'test failure'},{status:fault});
+      if(path==='/api/call/end'){didSave=true;uiState.calls=[{id:'fake-call-id',ended_at:Date.now(),language,feedback_submitted:0}];}
       if(path==='/api/feedback')Object.assign(uiState.calls[0],{feedback_submitted:1});
       return Response.json(path==='/api/status'?{ready:true}:path==='/api/call'?{callId:'fake-call-id',sdp:'v=0\r\n'}:path.startsWith('/api/state')?uiState:{ok:true});
     }});
@@ -177,6 +182,7 @@ test('a resumed user turn cancels automatic closing, and a save failure prevents
     failed.question(0);failed.emit({type:'conversation.item.input_audio_transcription.completed',item_id:'user',transcript:'Une idée.'});
     failed.document.getElementById('hangup-button').click();await failed.settle();
     assert(!failed.document.body.classList.contains('leaving-bubble'));
+    failed.tick(750);await failed.settle();failed.tick(1750);await failed.settle();
     failed.document.querySelector('#error button').click();await failed.settle();
     assert(failed.document.body.classList.contains('leaving-bubble'));
   }finally{failed.close();}
@@ -398,4 +404,71 @@ test('a late failure from the previous turn neither hangs up nor removes the new
     s.tick(29000);await s.settle();assert.equal(s.document.getElementById('call-panel').hidden,true);
     assert.match(s.document.getElementById('error').textContent,/ne répond plus/);
   }finally{s.close();}
+});
+
+function hangupWithText(s){
+  s.question(0);
+  s.emit({type:'conversation.item.input_audio_transcription.completed',item_id:'save-user',transcript:'Une idée à garder.'});
+  s.document.getElementById('hangup-button').click();
+}
+test('temporary save failures recover automatically with the same transcript and one active request',async()=>{
+  for(const failure of [500,'network','html']){
+    const s=await setup({saveErrors:[failure]});try{
+      hangupWithText(s);await s.settle();
+      assert.equal(s.track.stopped,true);assert.equal(s.document.getElementById('call-button').disabled,true);
+      assert.equal(s.document.getElementById('error').dataset.tone,'info');
+      s.window.dispatchEvent(new s.window.Event('online'));s.window.dispatchEvent(new s.window.Event('online'));await s.settle();
+      assert.equal(s.http.filter(r=>r.path==='/api/call/end').length,1);
+      s.tick(750);await s.settle();
+      const writes=s.http.filter(r=>r.path==='/api/call/end');assert.equal(writes.length,2);
+      assert.deepEqual(writes[0].data,writes[1].data);
+      assert.equal(s.document.getElementById('error').dataset.tone,'info');
+      assert(s.document.body.classList.contains('leaving-bubble'));
+      assert.equal(s.document.getElementById('error').querySelector('button'),null);
+    }finally{s.close();}
+  }
+});
+test('a stalled save times out and retries while keeping the transcript',async()=>{
+  const s=await setup({saveErrors:['timeout']});try{
+    hangupWithText(s);await s.settle();s.tick(15000);await s.settle();
+    assert(!s.document.body.classList.contains('leaving-bubble'));
+    s.tick(750);await s.settle();
+    assert.equal(s.http.filter(r=>r.path==='/api/call/end').length,2);
+    assert(s.document.body.classList.contains('leaving-bubble'));
+  }finally{s.close();}
+});
+test('repeated failures keep a usable retry button and never navigate before confirmation',async()=>{
+  const s=await setup({saveErrors:[500,500,500,500,500,500]});try{
+    hangupWithText(s);await s.settle();
+    s.tick(750);await s.settle();s.tick(1750);await s.settle();
+    assert.equal(s.http.filter(r=>r.path==='/api/call/end').length,3);
+    s.document.querySelector('#error button').click();await s.settle();
+    s.tick(750);await s.settle();s.tick(1750);await s.settle();
+    assert.equal(s.http.filter(r=>r.path==='/api/call/end').length,6);
+    assert(!s.document.body.classList.contains('leaving-bubble'));
+    assert.equal(s.document.getElementById('call-button').disabled,true);
+    s.document.querySelector('#error button').click();await s.settle();
+    assert(s.document.body.classList.contains('leaving-bubble'));
+  }finally{s.close();}
+});
+test('refresh failures do not repeat a confirmed save or claim the transcript is unsaved',async()=>{
+  const s=await setup({language:'en',refreshErrors:[500,500,500]});try{
+    hangupWithText(s);await s.settle();s.tick(750);await s.settle();s.tick(1750);await s.settle();
+    assert.equal(s.http.filter(r=>r.path==='/api/call/end').length,1);
+    assert.match(s.document.getElementById('error').textContent,/conversation is saved/);
+    assert.equal(s.document.querySelector('#error button').textContent,'Refresh the thread');
+    s.document.querySelector('#error button').click();await s.settle();
+    assert.equal(s.http.filter(r=>r.path==='/api/call/end').length,1);
+    assert(s.document.body.classList.contains('leaving-bubble'));
+  }finally{s.close();}
+});
+test('invalid or unauthorized saves are not automatically retried',async()=>{
+  for(const status of [400,401,403,404,413]){
+    const s=await setup({saveErrors:[status]});try{
+      hangupWithText(s);await s.settle();s.tick(5000);await s.settle();
+      assert.equal(s.http.filter(r=>r.path==='/api/call/end').length,1);
+      assert(s.document.querySelector('#error button'));
+      assert(!s.document.body.classList.contains('leaving-bubble'));
+    }finally{s.close();}
+  }
 });

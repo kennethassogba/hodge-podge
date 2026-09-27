@@ -1,25 +1,28 @@
-import { takeAccessCode, afterLink, goAfter } from './access.js?v=0.5.3';
-import { voiceResponseDiagnostic } from './voice-diagnostics.js?v=0.5.3';
-import { QUESTIONS, QUESTIONS_EN } from './coaching-protocol.js?v=0.5.3';
-import { t, getLanguage, initLanguage, setLanguage } from './i18n.js?v=0.5.3';
+import { takeAccessCode, afterLink, goAfter } from './access.js?v=0.5.4';
+import { voiceResponseDiagnostic } from './voice-diagnostics.js?v=0.5.4';
+import { QUESTIONS, QUESTIONS_EN } from './coaching-protocol.js?v=0.5.4';
+import { t, getLanguage, initLanguage, setLanguage } from './i18n.js?v=0.5.4';
 const invitationCode = takeAccessCode();
 initLanguage(document);
 
 const $ = id => document.getElementById(id);
 let state = { threads: [], messages: [], notes: [], decisions: [], threadId: null };
-let authenticated = false, initialized = false, busy = false, editingNote = null, call = null, pendingSave = null;
+let authenticated = false, initialized = false, busy = false, editingNote = null, call = null, pendingSave = null, saveRequest = null, pendingSaved = false;
 const date = ms => new Intl.DateTimeFormat(getLanguage()==='en'?'en-GB':'fr-FR', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }).format(ms);
 function error(message='',tone='error') { $('error').textContent = t(message); $('error').hidden = !message; $('error').dataset.tone=tone; }
-async function api(path, data, method = data ? 'POST' : 'GET') {
-  const response = await fetch(`/api/${path}`, {method,headers:data ? {'Content-Type':'application/json'} : {},body:data ? JSON.stringify({language:getLanguage(),...data}) : undefined});
-  const result = await response.json();
+async function api(path, data, method = data ? 'POST' : 'GET', signal) {
+  const response = await fetch(`/api/${path}`, {method,signal,headers:data ? {'Content-Type':'application/json'} : {},body:data ? JSON.stringify({language:getLanguage(),...data}) : undefined});
+  let result;
+  try{result=await response.json();}catch{
+    const e=new Error(t('La demande a échoué.'));e.status=response.ok?502:response.status;throw e;
+  }
   if (!response.ok) { const e = new Error(t(result.error) || t('La demande a échoué.')); e.status=response.status; throw e; }
   return result;
 }
 function node(tag, className, content) { const n = document.createElement(tag); if (className) n.className=className; if (content !== undefined) n.textContent=content; return n; }
 function updateControls() {
   document.querySelectorAll('.thread-button').forEach(button=>{button.disabled=busy||Boolean(call)||Boolean(pendingSave);});
-  $('send-button').disabled = !initialized || busy || Boolean(call) || !navigator.onLine;
+  $('send-button').disabled = !initialized || busy || Boolean(call) || Boolean(pendingSave) || !navigator.onLine;
   $('call-button').disabled = !initialized || busy || Boolean(call) || Boolean(pendingSave) || !navigator.onLine;
   $('new-thread').disabled = !initialized || busy || Boolean(call) || Boolean(pendingSave);
   $('add-note').disabled = !initialized || busy || Boolean(call);
@@ -63,7 +66,7 @@ function render() {
   renderFeedback();
   updateControls();
 }
-async function load(threadId=state.threadId) { state=await api(`state${threadId ? `?thread=${encodeURIComponent(threadId)}`:''}`);authenticated=true;render(); }
+async function load(threadId=state.threadId,signal) { state=await api(`state${threadId ? `?thread=${encodeURIComponent(threadId)}`:''}`,undefined,'GET',signal);authenticated=true;render(); }
 async function guard(fn) { error();try{await fn();}catch(e){if(e.status===401){authenticated=false;$('access-dialog').showModal();}else error(e.message);} }
 function access() { if(authenticated)return true;$('access-dialog').showModal();return false; }
 async function ensureThread() {if(!state.threadId){const r=await api('threads',{});state.threadId=r.id;}}
@@ -82,7 +85,7 @@ $('access-form').addEventListener('submit',async event=>{
   catch(e){$('access-error').textContent=e.message;}finally{$('access-submit').disabled=false;}
 });
 $('composer').addEventListener('submit',event=>{event.preventDefault();void guard(async()=>{
-  const value=$('message').value.trim();if(!value||busy||call||!access())return;
+  const value=$('message').value.trim();if(!value||busy||call||pendingSave||!access())return;
   busy=true;updateControls();const requestId=crypto.randomUUID();
   try{await ensureThread();const result=await api('chat',{threadId:state.threadId,text:value,id:requestId});$('message').value='';await load();scrollFeed();if(result.action==='cloturer'){busy=false;goAfter(state.threadId);}}
   finally{busy=false;updateControls();$('message').focus();}
@@ -311,10 +314,42 @@ async function startCall(){
     c.connectionTimer=setTimeout(()=>{if(call===c&&c.channel.readyState!=='open')void endCall(t('La connexion audio n’a pas abouti. Réessaie.'));},20000);
   }catch(e){await endCall('', 'error');throw new Error(e.name==='NotAllowedError'?t('Le micro n’est pas autorisé. Tu peux continuer par écrit ou autoriser le micro dans ton navigateur.'):e.message);}
 }
-async function saveCall(){
-  if(!pendingSave)return;
-  const saved=pendingSave;await api('call/end',saved);pendingSave=null;await load();updateControls();
-  if(saved.outcome==='ended'&&saved.messages.some(m=>m.role==='user'))goAfter(state.threadId,saved.callId);
+async function saveAttempt(fn){
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+  try{return await fn(controller.signal);}finally{clearTimeout(timer);}
+}
+function saveCall(){
+  if(saveRequest)return saveRequest;
+  if(!pendingSave)return Promise.resolve();
+  const saved=pendingSave,threadId=state.threadId;
+  error(t('Sauvegarde de ton échange…'),'info');
+  saveRequest=(async()=>{
+    for(let attempt=0;attempt<3;attempt++){
+      try{
+        // A confirmed write must not be repeated when only the refreshed thread failed to load.
+        if(!pendingSaved){await saveAttempt(signal=>api('call/end',saved,'POST',signal));pendingSaved=true;}
+        await saveAttempt(signal=>load(threadId,signal));
+        pendingSave=null;pendingSaved=false;error();render();
+        if(saved.outcome==='ended'&&saved.messages.some(m=>m.role==='user'))goAfter(threadId,saved.callId);
+        return;
+      }catch(e){
+        const transient=['TypeError','AbortError','TimeoutError'].includes(e.name)||[408,429].includes(e.status)||e.status>=500;
+        if(!transient||attempt===2)throw e;
+        error(t(pendingSaved?'Échange sauvegardé. Actualisation du fil…':'La sauvegarde prend un instant. Nouvelle tentative…'),'info');
+        await new Promise(resolve=>setTimeout(resolve,attempt===0?750:1750));
+      }
+    }
+  })().finally(()=>{saveRequest=null;updateControls();});
+  updateControls();return saveRequest;
+}
+async function retrySave(){
+  try{await saveCall();}catch{
+    error(t(pendingSaved?'Ton échange est sauvegardé, mais le fil n’a pas pu être actualisé.':
+      'La transcription n’a pas encore été sauvegardée. Garde cette page ouverte et utilise « Réessayer la sauvegarde ».'));
+    const retry=node('button','text-button',t(pendingSaved?'Actualiser le fil':'Réessayer la sauvegarde'));
+    retry.onclick=()=>{void retrySave();};$('error').append(retry);
+  }
+  render();
 }
 async function endCall(message='',outcome=message?'error':'ended'){
   const c=call;if(!c||c.ending)return;c.ending=true;
@@ -326,15 +361,16 @@ async function endCall(message='',outcome=message?'error':'ended'){
   for(const cleanup of [()=>c.stream?.getTracks().forEach(t=>t.stop()),()=>c.channel?.close(),()=>c.peer.close(),()=>c.audio.pause(),()=>{c.audio.srcObject=null;}]){try{cleanup();}catch{}}
   const messages=[...c.transcript.values()].sort((a,b)=>a.order-b.order).filter(m=>m.text.trim()&&!m.interrupted).map(m=>({role:m.role,text:m.text}));
   if(c.callId)feedbackChoice=c.callId;
+  pendingSaved=false;
   if(c.callId)pendingSave={callId:c.callId,messages,durationSeconds:c.started?Math.floor((Date.now()-c.started)/1000):0,interruptions:c.interruptions,transcriptionFailures:c.transcriptionFailures,outcome};
-  try{await saveCall();if(message)error(message,outcome==='ended'?'info':'error');else if(messages.length)error(t('Appel terminé. Tu peux relire le fil et choisir « Garder quelques notes ».'),'info');}
-  catch{error(t('La transcription n’a pas encore été sauvegardée. Garde cette page ouverte et utilise « Réessayer la sauvegarde ».'));}
-  render();if(pendingSave){const retry=node('button','text-button',t('Réessayer la sauvegarde'));retry.onclick=()=>guard(async()=>{await saveCall();error();render();});$('error').append(retry);}scrollFeed();
+  await retrySave();
+  if(!pendingSave){if(message)error(message,outcome==='ended'?'info':'error');else if(messages.length)error(t('Appel terminé. Tu peux relire le fil et choisir « Garder quelques notes ».'),'info');}
+  scrollFeed();
 }
 $('call-button').onclick=()=>guard(startCall);
 $('hangup-button').onclick=()=>{void endCall();};
 window.addEventListener('offline',()=>{document.body.classList.add('offline');error(t('Tu es hors connexion. Ton message reste ici.'));if(call)void endCall(t('Connexion perdue. Garde cette page ouverte pour sauvegarder le fil.'));updateControls();});
-window.addEventListener('online',()=>{document.body.classList.remove('offline');updateControls();if(pendingSave)void guard(saveCall);else error();});
+window.addEventListener('online',()=>{document.body.classList.remove('offline');updateControls();if(pendingSave)void retrySave();else error();});
 window.addEventListener('beforeunload',event=>{if(call||pendingSave){event.preventDefault();event.returnValue='';}});
 window.addEventListener('pagehide',()=>{if(call){call.stream?.getTracks().forEach(t=>t.stop());call.peer.close();}});
 

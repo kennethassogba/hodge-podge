@@ -58,6 +58,19 @@ Les logs Cloudflare `voice_response_issue` contiennent des catégories autorisé
 et l’indication de reprise prévue. Aucun texte, audio ou message brut du fournisseur n’y est ajouté.
 Ces journaux suivent l’échantillonnage configuré ; ils ne sont pas un historique exhaustif.
 
+## Sauvegarde à la fin de l’appel
+
+La fermeture du micro est immédiate. La sauvegarde et le rechargement du fil sont ensuite retentés
+jusqu’à trois fois en cas d’erreur réseau ou temporaire du serveur, avec des attentes de 750 ms
+puis 1 750 ms. Chaque requête expire au bout de quinze secondes. Les tentatives simultanées
+(bouton, retour en ligne) partagent le même travail ; le serveur déduplique par identifiant d’appel.
+
+Une écriture confirmée n’est pas renvoyée si seul le rechargement du fil échoue. Dans ce cas, le
+message indique que l’échange est sauvegardé et propose d’actualiser le fil. Après trois échecs de
+sauvegarde, la transcription reste en mémoire dans l’onglet et le bouton de reprise reste disponible,
+y compris si une reprise manuelle échoue aussi. L’onglet doit rester ouvert. Le passage à
+l’après-bulle attend une sauvegarde confirmée et le chargement du fil.
+
 ## Vérification
 
 Les tests de `tests/voice-ui.test.js` exécutent le vrai contrôleur avec des événements WebRTC fictifs.
