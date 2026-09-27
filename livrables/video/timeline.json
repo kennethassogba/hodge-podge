@@ -1,0 +1,74 @@
+[
+  {
+    "id": "hook",
+    "title": "Tout repasse par vous ?",
+    "narration": "Une réunion se termine. Et toutes les décisions reviennent encore vers vous. Vous voulez que ça change ?",
+    "start": 0,
+    "audio_start": 0.38,
+    "audio_duration": 7.000916666666667,
+    "duration": 7.800916666666667
+  },
+  {
+    "id": "coach",
+    "title": "La Bulle. Prendre du recul.",
+    "narration": "Voici La Bulle, le projet de Hodge Podge. Un coach IA accessible par message ou par appel, en français et en anglais. Il suit le protocole Kedo, une question à la fois. L’objectif : vous aider à construire votre propre réponse.",
+    "start": 7.800916666666667,
+    "audio_start": 8.180916666666667,
+    "audio_duration": 14.769041666666666,
+    "duration": 15.569041666666667
+  },
+  {
+    "id": "memory",
+    "title": "Garder le fil.",
+    "narration": "Dans cet exemple, un manager veut laisser son équipe décider davantage. À la fin, il choisit ce qu’il garde. Les notes sont relues, modifiées, puis conservées. À la séance suivante, le coach retrouve cette mémoire.",
+    "start": 23.369958333333333,
+    "audio_start": 23.749958333333332,
+    "audio_duration": 14.188875,
+    "duration": 14.988875
+  },
+  {
+    "id": "notion",
+    "title": "L’après-bulle. Passer à l’action.",
+    "narration": "Et si le problème venait aussi de l’organisation ? L’après-bulle prolonge la réflexion dans Notion. Vous connectez votre espace, choisissez une intention et quelques pages à explorer.",
+    "start": 38.35883333333334,
+    "audio_start": 38.73883333333334,
+    "audio_duration": 10.906166666666667,
+    "duration": 11.706166666666668
+  },
+  {
+    "id": "agents",
+    "title": "Trois agents. Des décisions.",
+    "narration": "Un premier agent enquête dans les documents et cite ses sources. Un deuxième confronte ses conclusions aux textes d’origine. Il peut les refuser si elles ne tiennent pas. Un troisième prépare une proposition concrète, uniquement si cette vérification est passée.",
+    "start": 50.065000000000005,
+    "audio_start": 50.44500000000001,
+    "audio_duration": 14.861708333333333,
+    "duration": 15.661708333333333
+  },
+  {
+    "id": "proposal",
+    "title": "Une proposition à vous approprier.",
+    "narration": "Ici, les documents montrent que chaque décision attend une validation du manager. Les agents proposent de clarifier qui peut décider de quoi. Vous relisez, vous ajustez, puis vous choisissez de créer une nouvelle page dans Notion.",
+    "start": 65.72670833333333,
+    "audio_start": 66.10670833333333,
+    "audio_duration": 14.002833333333333,
+    "duration": 14.802833333333334
+  },
+  {
+    "id": "system",
+    "title": "Simple devant. Agentique derrière.",
+    "narration": "Les étapes sont sauvegardées et l’analyse continue même si vous fermez la page. Le coaching reste indépendant : aucune connexion Notion n’est nécessaire pour commencer. Les modèles OpenAI travaillent derrière une interface volontairement simple.",
+    "start": 80.52954166666667,
+    "audio_start": 80.90954166666667,
+    "audio_duration": 14.769041666666666,
+    "duration": 15.569041666666667
+  },
+  {
+    "id": "outro",
+    "title": "Réfléchir. Puis faire.",
+    "narration": "La Bulle, pour prendre du recul. L’après-bulle, pour faire évoluer la façon de travailler. Un projet de Kenneth, Séb et Fano, pour le hackathon X-IA.",
+    "start": 96.09858333333334,
+    "audio_start": 96.47858333333333,
+    "audio_duration": 11.23775,
+    "duration": 13.943083333333337
+  }
+]

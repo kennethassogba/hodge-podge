@@ -12,3 +12,10 @@ test-results/
 Hodge-Podge-dossier-equipe-*.zip
 worker-configuration.d.ts
 .DS_Store
+
+# Local video exports and generated assets (keep scripts/storyboard in Git).
+livrables/video/assets/
+livrables/video/*.mp4
+livrables/video/*.png
+livrables/video/*.jpg
+livrables/video/*-sources.zip

@@ -1,0 +1,42 @@
+[
+  {
+    "id": "hook",
+    "title": "Tout repasse par vous ?",
+    "narration": "Une réunion se termine. Et toutes les décisions reviennent encore vers vous. Vous voulez que ça change ?"
+  },
+  {
+    "id": "coach",
+    "title": "La Bulle. Prendre du recul.",
+    "narration": "Voici La Bulle, le projet de Hodge Podge. Un coach IA accessible par message ou par appel, en français et en anglais. Il suit le protocole Kedo, une question à la fois. L’objectif : vous aider à construire votre propre réponse."
+  },
+  {
+    "id": "memory",
+    "title": "Garder le fil.",
+    "narration": "Dans cet exemple, un manager veut laisser son équipe décider davantage. À la fin, il choisit ce qu’il garde. Les notes sont relues, modifiées, puis conservées. À la séance suivante, le coach retrouve cette mémoire."
+  },
+  {
+    "id": "notion",
+    "title": "L’après-bulle. Passer à l’action.",
+    "narration": "Et si le problème venait aussi de l’organisation ? L’après-bulle prolonge la réflexion dans Notion. Vous connectez votre espace, choisissez une intention et quelques pages à explorer."
+  },
+  {
+    "id": "agents",
+    "title": "Trois agents. Des décisions.",
+    "narration": "Un premier agent enquête dans les documents et cite ses sources. Un deuxième confronte ses conclusions aux textes d’origine. Il peut les refuser si elles ne tiennent pas. Un troisième prépare une proposition concrète, uniquement si cette vérification est passée."
+  },
+  {
+    "id": "proposal",
+    "title": "Une proposition à vous approprier.",
+    "narration": "Ici, les documents montrent que chaque décision attend une validation du manager. Les agents proposent de clarifier qui peut décider de quoi. Vous relisez, vous ajustez, puis vous choisissez de créer une nouvelle page dans Notion."
+  },
+  {
+    "id": "system",
+    "title": "Simple devant. Agentique derrière.",
+    "narration": "Les étapes sont sauvegardées et l’analyse continue même si vous fermez la page. Le coaching reste indépendant : aucune connexion Notion n’est nécessaire pour commencer. Les modèles OpenAI travaillent derrière une interface volontairement simple."
+  },
+  {
+    "id": "outro",
+    "title": "Réfléchir. Puis faire.",
+    "narration": "La Bulle, pour prendre du recul. L’après-bulle, pour faire évoluer la façon de travailler. Un projet de Kenneth, Séb et Fano, pour le hackathon X-IA."
+  }
+]

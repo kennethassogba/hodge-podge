@@ -1,0 +1,137 @@
+[
+  {
+    "start": 0.38,
+    "end": 4.599999904632568,
+    "text": "Une réunion se termine, et toutes les décisions\nreviennent encore vers vous."
+  },
+  {
+    "start": 5.539999961853027,
+    "end": 7.380916666666667,
+    "text": "Vous voulez que ça change ?"
+  },
+  {
+    "start": 8.84000015258789,
+    "end": 14.452069118105133,
+    "text": "Voici La Bulle, le projet de Hodge Podge, un\ncoach IA accessible par message ou par appel, en"
+  },
+  {
+    "start": 14.452069118105133,
+    "end": 15.84000015258789,
+    "text": "français et en anglais."
+  },
+  {
+    "start": 16.579999923706055,
+    "end": 18.940000534057617,
+    "text": "Il suit le protocole Kedo, une question à la\nfois."
+  },
+  {
+    "start": 19.600000381469727,
+    "end": 22.68000030517578,
+    "text": "L'objectif ? Vous aider à construire votre\npropre réponse."
+  },
+  {
+    "start": 23.8799991607666,
+    "end": 28.139999389648438,
+    "text": "Dans cet exemple, un manager veut laisser son\néquipe décider davantage."
+  },
+  {
+    "start": 28.139999389648438,
+    "end": 30.65999984741211,
+    "text": "À la fin, il choisit ce qu'il garde."
+  },
+  {
+    "start": 31.31999969482422,
+    "end": 34.13999938964844,
+    "text": "Les notes sont relues, modifiées, puis\nconservées."
+  },
+  {
+    "start": 34.7599983215332,
+    "end": 37.599998474121094,
+    "text": "À la séance suivante, le coach retrouve cette\nmémoire."
+  },
+  {
+    "start": 38.7400016784668,
+    "end": 42.02000045776367,
+    "text": "Et si le problème venait aussi de l'organisation\n?"
+  },
+  {
+    "start": 42.02000045776367,
+    "end": 44.279998779296875,
+    "text": "L’après-bulle prolonge la réflexion dans Notion."
+  },
+  {
+    "start": 45.20000076293945,
+    "end": 49.34000015258789,
+    "text": "Vous connectez votre espace, choisissez une\nintention, et quelques pages à explorer."
+  },
+  {
+    "start": 50.52000045776367,
+    "end": 54.29999923706055,
+    "text": "Un premier agent enquête dans les documents et\ncite ses sources."
+  },
+  {
+    "start": 54.29999923706055,
+    "end": 57.599998474121094,
+    "text": "Un deuxième confronte ses conclusions au texte\nd'origine."
+  },
+  {
+    "start": 58.34000015258789,
+    "end": 60.220001220703125,
+    "text": "Il peut les refuser si elles ne tiennent pas."
+  },
+  {
+    "start": 60.65999984741211,
+    "end": 65.0999984741211,
+    "text": "Un troisième prépare une proposition concrète,\nuniquement si cette vérification est passée."
+  },
+  {
+    "start": 66.30000305175781,
+    "end": 70.76000213623047,
+    "text": "Ici, les documents montrent que chaque décision\nattend une validation du manager."
+  },
+  {
+    "start": 71.5199966430664,
+    "end": 74.18000030517578,
+    "text": "Les agents proposent de clarifier qui peut\ndécider de quoi."
+  },
+  {
+    "start": 74.9000015258789,
+    "end": 79.77999877929688,
+    "text": "Vous relisez, vous ajustez, puis vous choisissez\nde créer une nouvelle page dans Notion."
+  },
+  {
+    "start": 80.90954166666667,
+    "end": 85.54000091552734,
+    "text": "Les étapes sont sauvegardées et l'analyse\ncontinue même si vous fermez la page."
+  },
+  {
+    "start": 86.13999938964844,
+    "end": 87.77999877929688,
+    "text": "Le coaching reste indépendant."
+  },
+  {
+    "start": 88.36000061035156,
+    "end": 90.55999755859375,
+    "text": "Aucune connexion Notion n'est nécessaire pour\ncommencer."
+  },
+  {
+    "start": 91.37999725341797,
+    "end": 95.41999816894531,
+    "text": "Les modèles OpenAI travaillent derrière une\ninterface volontairement simple."
+  },
+  {
+    "start": 96.58000183105469,
+    "end": 98.69999694824219,
+    "text": "La Bulle pour prendre du recul."
+  },
+  {
+    "start": 99.66000366210938,
+    "end": 102.5,
+    "text": "L’après-bulle pour faire évoluer la façon de\ntravailler."
+  },
+  {
+    "start": 103.33999633789062,
+    "end": 107.36000061035156,
+    "text": "Un projet de Kenneth, Séb et Fano pour le\nhackathon X-IA."
+  }
+]

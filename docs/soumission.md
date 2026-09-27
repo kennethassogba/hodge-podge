@@ -1,34 +1,46 @@
 # Kit de démonstration et de soumission
 
-Statut : trame préparée le 26 septembre 2026. Adapter au logiciel réellement livré ; ne pas annoncer une intégration non terminée.
+Vidéo préparée le 27 septembre 2026. Le montage présente La Bulle et l’après-bulle.
 
 ## Description courte proposée
 
-> Hodge Podge crée une bulle de coaching vocal autour d’une situation managériale réelle. L’application protège les temps de réflexion, aide la personne à préciser ce qu’elle veut retenir ou essayer et reprend la séance suivante à partir de ce qu’elle a réellement essayé. Les modèles OpenAI conduisent l’échange et proposent une mémoire validée par l’utilisateur. On écrit ou on appelle depuis une page web, puis on retrouve ses notes à la séance suivante.
+La Bulle propose un coaching par message ou par appel, en français et en anglais, guidé par le
+protocole Kedo. La personne conserve les notes qu’elle souhaite retrouver à la séance suivante.
+Avec l’après-bulle, elle peut prolonger sa réflexion dans Notion : trois agents examinent les pages
+choisies, vérifient leurs conclusions et préparent une proposition concrète à relire avant publication.
 
-## Scénario de vidéo — 1 min 55, marge de 5 secondes
+## Vidéo : 1 min 50
 
-| Temps | À montrer | Message |
-|---|---|---|
-| 0:00–0:12 | Une situation : « Je reprends toujours les tâches que je délègue » | Le problème apparaît dans une conversation réelle |
-| 0:12–0:25 | Message de contexte puis bouton Appeler | L’utilisateur choisit ce que le coach sait |
-| 0:25–0:55 | Une question, réponse orale et reprise automatique réelle | La personne peut poursuivre sa pensée sans être coupée |
-| 0:55–1:15 | Quelques notes corrigées puis conservées avec accord | Le prochain pas vient de la personne |
-| 1:15–1:38 | Deuxième séance, explicitement simulée dans le temps, avec retour saisi | Le coach repart de ce qui a été tenté, pas d’un résumé générique |
-| 1:38–1:48 | Vue technique concise : décision LLM, outil, résultat persistant | On voit la logique agentique derrière l’expérience |
-| 1:48–1:55 | Équipe, repo et accès de test | Produit testable, périmètre clair |
+Le fichier final est `livrables/video/la-bulle-hackathon.mp4`. Il contient la voix off française
+et les sous-titres incrustés, en 1920 × 1080. Le fichier `.fr.srt` permet aussi de joindre les
+sous-titres séparément. Les fichiers multimédias restent locaux et ne sont pas ajoutés à Git.
 
-Conserver un vrai silence audible dans la vidéo. Afficher « Quelques jours plus tard — scénario de démonstration » à la transition ; ne pas prétendre avoir mesuré un progrès sur plusieurs jours pendant le week-end. L’appel se déroule dans le navigateur.
+| Temps | Contenu |
+|---|---|
+| 0:00–0:08 | Toutes les décisions repassent par le manager : une situation concrète. |
+| 0:08–0:23 | La Bulle : message ou appel, français et anglais, protocole Kedo. |
+| 0:23–0:38 | Des notes relues et conservées pour garder le fil. |
+| 0:38–0:50 | L’après-bulle : une intention et des pages Notion choisies. |
+| 0:50–1:06 | Enquête, vérification et proposition : les trois agents et leur pouvoir de décision. |
+| 1:06–1:21 | Les sources, la proposition de règle et la relecture avant publication. |
+| 1:21–1:36 | Les étapes persistantes et l’analyse en arrière-plan. |
+| 1:36–1:50 | L’équipe, le lien de l’application et le dépôt GitHub. |
 
-## Jeu de données fictif
+Le [script et le kit de montage](../livrables/video/README.md) permettent de reprendre la vidéo.
 
-Manager : Camille. Interlocuteur : Alex. Situation : Camille reprend systématiquement les solutions proposées par Alex. Contexte : un prochain entretien individuel et un message de préparation fictif.
+## Scénario de démonstration
 
-Séance 1 : Camille explore son besoin de contrôle et choisit de demander une proposition avant de donner la sienne. Le système n’affirme pas une cause psychologique ; il conserve uniquement ce que Camille valide.
+Le projet Atlas est fictif. Deux documents décrivent une organisation où les décisions courantes
+attendent la validation du manager. Celui-ci veut clarifier les décisions que son équipe peut prendre
+seule. Les agents proposent une règle à discuter collectivement.
 
-Retour : « J’ai posé la question, mais j’ai répondu à sa place presque aussitôt. »
+Les captures montrent les véritables interfaces de l’application. Les réponses du coach, la note,
+l’enquête, la vérification et la proposition ont été produites par les modèles OpenAI via le code du
+projet, sur une base locale et des documents fictifs. Les captures rejouent ces résultats. Aucun espace
+Notion réel n’a été modifié et la vidéo ne montre pas de publication effectuée.
 
-Séance 2 : le coach rappelle précisément l’essai, demande ce qui s’est passé et aide Camille à choisir si elle veut l’ajuster. Variante de test : Camille n’a rien essayé. Autre variante : elle ne veut pas créer d’action. Dans les deux cas, aucune réussite fictive n’est enregistrée.
+La voix off est synthétique ; cela est indiqué à l’écran. Le montage ne contient ni conversation
+personnelle ni code d’accès. Les animations servent à expliquer le fonctionnement des agents.
 
 ## Lecture des critères du jury
 
