@@ -1,6 +1,18 @@
 # La Bulle — Hodge Podge
 
-Une application de coaching par messages et appel vocal. Les questions du protocole Kedo, une à la fois, du temps pour réfléchir, et des notes que la personne choisit de garder pour la prochaine séance. Projet du hackathon X-IA, construit avec OpenAI et Cloudflare.
+Un espace pour réfléchir avec un coach, puis prolonger cette réflexion par une action concrète. Projet du hackathon X-IA, construit avec OpenAI et Cloudflare.
+
+## Deux usages
+
+### La Bulle — le coaching
+
+Le parcours principal : échanger par messages ou appel vocal, en français ou en anglais. Le coach suit le protocole Kedo, une question à la fois. La personne choisit les notes à garder pour reprendre le fil à la prochaine séance. Aucune connexion Notion n’est nécessaire.
+
+### L’après-bulle — passer à l’action
+
+Un prolongement facultatif dans Notion. À partir d’une intention et de quelques pages choisies, trois agents examinent les documents, vérifient les conclusions et préparent une proposition concrète : une trame de réunion, une règle de décision ou une clarification des responsabilités. La personne relit, modifie et choisit de publier une nouvelle page dans Notion.
+
+Le bouton **L’après-bulle** est accessible dès l’accueil. La connexion Notion intervient uniquement dans ce second parcours et permet de retrouver les propositions sur plusieurs appareils. Aucune transcription du coaching n’est jointe automatiquement.
 
 ## Essayer
 
@@ -12,11 +24,13 @@ L’application utilise réellement OpenAI : aucun mode découverte ni réponse 
 
 1. Écrire une situation dans le champ de message et entrer le code d’accès.
 2. Envoyer le message, ou choisir **Appeler** et autoriser le microphone.
-3. Pendant l’appel, parle naturellement : OpenAI détecte quand tu as terminé et répond directement. Les minuteries de silence ajoutées dans le navigateur ont été retirées. Il n’y a aucun bouton de prise de parole ; seul **Raccrocher** reste affiché.
+3. Pendant l’appel, parle naturellement : le coach détecte quand tu as terminé et répond directement. Les minuteries de silence ajoutées dans le navigateur ont été retirées. Il n’y a aucun bouton de prise de parole ; seul **Raccrocher** reste affiché.
 4. Raccrocher, choisir **Garder quelques notes**, corriger la proposition puis **Conserver**.
 5. Ouvrir une **Nouvelle séance** : les notes conservées accompagnent le nouvel échange.
 
-Un casque est conseillé. L’appel s’arrête après vingt minutes dans l’interface. Le navigateur doit rester ouvert. Le test de confort vocal avec Séb reste indispensable : les tests automatiques ne remplacent pas une conversation humaine.
+Un casque est conseillé. L’appel s’arrête après vingt minutes dans l’interface. Le navigateur doit rester ouvert.
+
+Pour essayer le second parcours, ouvrir **L’après-bulle**, connecter Notion, écrire une intention et sélectionner 1 à 3 pages. Cliquer sur **Examiner ces documents**, puis relire la proposition avant de la publier.
 
 ## Développement local
 
@@ -33,6 +47,8 @@ npm run dev
 ```
 
 Ouvrir http://127.0.0.1:8787. Les modèles configurés dans `wrangler.jsonc` sont `gpt-4.1-mini` pour le texte et les notes, `gpt-realtime-2.1` pour la voix et `gpt-4o-transcribe` pour la transcription. L’accès à ces modèles a été vérifié avec le compte de l’équipe.
+
+Pour activer l’après-bulle, configurer les identifiants OAuth Notion selon [le guide Notion](docs/notion.md). Sans cette configuration, le coach fonctionne normalement. La migration `0003_notion.sql`, incluse dans les commandes de migration ci-dessus, ajoute les tables nécessaires. Le guide détaille aussi les agents, les limites de lecture et les essais à réaliser.
 
 ```sh
 npm run check
@@ -81,12 +97,6 @@ Messages et appel WebRTC OpenAI, silences automatiques, reprise après interrupt
 
 L’agent vocal reçoit le fil récent et les notes approuvées. Realtime gère directement les tours de parole et les interruptions avec `semantic_vad`. Les 14 questions du PDF sont dans les instructions du modèle, qui doit les suivre dans l’ordre et mot pour mot, sauf demande explicite de répétition, explication, temps, passage de question, arrêt ou envie de passer à l’action. Le logiciel ne prétend ni lire un agenda ni envoyer un rappel. L’agenda, Telegram et les autres fournisseurs restent hors de cette version.
 
-## Version 0.4.0 : suite facultative dans Notion
-
-La navigation de l’accueil ouvre `/notion`. La personne connecte Notion uniquement si elle souhaite poursuivre. Elle choisit une intention et quelques pages ; trois agents examinent les documents, vérifient les conclusions et préparent une nouvelle page à relire avant publication. Aucune transcription n’est jointe automatiquement. La connexion Notion sert aussi à retrouver cet espace sur plusieurs appareils. Configuration, limites, API et recette : [docs/notion.md](docs/notion.md).
-
-Sans identifiants OAuth configurés, cette suite indique qu’elle n’est pas encore activée ; le coach fonctionne normalement. La migration `0003_notion.sql` est nécessaire avant déploiement.
-
 ## Coaching en français et anglais
 
 - Choix FR/EN avant l’appel : interface, protocole, voix, transcription et brouillons de notes. Les notes et échanges existants ne sont pas traduits automatiquement. Les deux scripts originaux Kedo (FR et EN, 24 septembre 2026) sont dans `public/coaching-protocol.js`.
@@ -101,7 +111,7 @@ Le code administrateur de cette installation est dans `.dev.vars.admin`, ignoré
 ## Données et limites
 
 - Le fil écrit et les transcriptions restent dans D1. L’application ne stocke pas les fichiers audio. Texte et audio sont transmis à OpenAI pour traitement.
-- Un espace est lié à un cookie de navigateur et expire après 30 jours ; une purge quotidienne supprime ensuite ses données. Perdre le cookie fait perdre l’accès : pas de compte ni de synchronisation entre appareils.
+- L’espace de coaching est lié à un cookie de navigateur et expire après 30 jours ; une purge quotidienne supprime ensuite ses données. Perdre le cookie fait perdre l’accès à cet espace. L’après-bulle possède un compte Notion distinct, accessible sur plusieurs appareils ; voir [sa conservation des données](docs/notion.md#api-et-conservation).
 - Seules les notes validées passent automatiquement d’une séance à l’autre. Dans une séance, le modèle reçoit au plus les 40 derniers messages ; la voix reçoit au plus les huit derniers messages écrits par la personne, sans anciennes questions de coaching. Maximum 20 notes.
 - Les transcriptions d’appel sont sauvegardées à la fin. En cas d’échec, laisser la page ouverte pour réessayer. Fermer brutalement peut perdre la transcription.
 - Aucun quota applicatif de messages, notes proposées ou appels et coupure automatique après vingt minutes dans le navigateur. OpenAI limite une session Realtime à 60 minutes ; ses limites de débit/crédit et les capacités Cloudflare continuent de s’appliquer. Les tentatives de connexion restent limitées contre le bruteforce. Un seul appel simultané par espace.
@@ -121,7 +131,7 @@ Le code administrateur de cette installation est dans `.dev.vars.admin`, ignoré
 
 Ce dépôt est le point central pour les trois membres. Les documents sont modifiables depuis GitHub. Les noms complets, la vidéo et le dépôt au hackathon restent à compléter. Échéance annoncée : 27 septembre 2026 à 23 h 59, fuseau à confirmer auprès de l’organisation.
 
-Référence de coaching : exemple Kedo transmis par Séb, daté du 24 septembre 2026. À la demande explicite de l’équipe, les 14 questions originales sont intégrées dans `public/coaching-protocol.js` avec leur attribution. Leur ordre et leur formulation servent de référence stricte. La fidélité vocale et la qualité de l’écoute restent à valider avec Séb. Police Manrope distribuée avec sa licence OFL dans `public/fonts/LICENSE-manrope.txt`.
+Référence de coaching : exemple Kedo transmis par Séb, daté du 24 septembre 2026. À la demande explicite de l’équipe, les 14 questions originales sont intégrées dans `public/coaching-protocol.js` avec leur attribution. Leur ordre et leur formulation servent de référence stricte. Police Manrope distribuée avec sa licence OFL dans `public/fonts/LICENSE-manrope.txt`.
 
 ## Version 0.4.1
 
