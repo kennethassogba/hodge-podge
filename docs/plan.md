@@ -1,6 +1,6 @@
 # Plan d’équipe
 
-Mise à jour : 26 septembre 2026.
+Mise à jour : 27 septembre 2026.
 
 ## Déjà réalisé
 
@@ -18,24 +18,43 @@ Mise à jour : 26 septembre 2026.
 - [x] Version bilingue FR/EN, réglage micro et filtrage audio OpenAI.
 - [x] Exceptions au script : passer une question, refuser le débrief, terminer pour agir.
 - [x] Correction et suppression des passages de transcription.
-- [x] Formulaire facultatif avec partage explicite et retrait possible.
+- [x] Formulaire facultatif en quatre questions, avec NPS dans le tableau équipe.
 - [x] Tableau équipe protégé par un code distinct, sans accès aux conversations ni aux notes.
-- [x] Suppression des quotas quotidiens ; coupure des appels portée à vingt minutes en version 0.3.2.
+- [x] Suppression des quotas quotidiens ; coupure des appels portée à vingt minutes en version
+      0.3.2.
 - [x] Mentions de conservation précisant OpenAI et les sauvegardes Cloudflare.
+
+- [x] Après-bulle avec récap modifiable, copie et email avec transcription facultative.
+- [x] Retour à une question précédente et pauses demandées pendant le coaching.
+- [x] Reprise d’une réponse vocale tronquée ou d’une panne temporaire sans couper tout l’appel.
+- [x] Description de soumission et positionnement harmonisés autour des deux usages.
+- [x] Vidéo de présentation de 1 min 50 montée avec un scénario fictif.
 
 ## Ensuite, dans cet ordre
 
-1. **Séb : essayer une séance et vérifier la fidélité au script anglais original.** Juger si les questions aident, si le rythme convient, si le coach impose une action. Noter les phrases précises à corriger.
-2. **Kenneth et Fano : vérifier sur leurs appareils.** Micro, casque, plusieurs réponses successives, silences, interruption, respect du script, notes puis nouvelle séance. Le résultat attendu est dans `silence.md`.
-3. **Inviter quelques testeurs et lire leurs retours dans /team.html, puis ajuster les prompts et le rythme.** Rejouer les scénarios concernés ; valider séparément le nouveau parcours Notion avant de l’ouvrir aux testeurs.
-4. **Préparer et enregistrer la vidéo.** Séb joue un cas fictif ; un autre membre filme l’écran et contrôle le son. Montrer un échange vocal réel sans masquer les temps de réponse par le montage.
-5. **Déposer.** Compléter les trois noms, vérifier l’accès au repo et à la vidéo, remettre les quatre livrables avant l’échéance.
+1. **Séb : essayer une séance et vérifier la fidélité au script anglais original.** Juger si les
+   questions aident, si le rythme convient, si le coach impose une action. Noter les phrases
+   précises à corriger.
+2. **Kenneth et Fano : vérifier sur leurs appareils.** Micro, casque, plusieurs réponses
+   successives, silences, interruption, respect du script, notes puis nouvelle séance. Le résultat
+   attendu est dans `silence.md`.
+3. **Inviter quelques testeurs et lire leurs retours dans /team.html, puis ajuster les prompts et le
+   rythme.** Rejouer les scénarios concernés ; valider séparément le nouveau parcours Notion avant
+   de l’ouvrir aux testeurs.
+4. **Relire et déposer la vidéo préparée.** Vérifier le son, les sous-titres et les liens. Le
+   montage utilise un scénario fictif et rejoue des résultats produits par les modèles ; le détail
+   est dans [le kit de soumission](soumission.md).
+5. **Déposer.** Compléter les trois noms, vérifier l’accès au repo et à la vidéo, remettre les
+   quatre livrables avant l’échéance.
 
-Répartition proposée, à adapter entre les trois membres. Le README et ce dossier sont le point central ; les corrections peuvent être discutées dans les Issues GitHub avec un responsable et un résultat attendu.
+Répartition proposée, à adapter entre les trois membres. Le README et ce dossier sont le point
+central ; les corrections peuvent être discutées dans les Issues GitHub avec un responsable et un
+résultat attendu.
 
 ## Ce qui reste hors de cette version
 
-Agenda, prise de rendez-vous, rappels, Telegram, WhatsApp, téléphone, plugin ChatGPT, autres fournisseurs de modèles. On pourra les réexaminer après un premier essai utile avec Séb.
+Agenda, prise de rendez-vous, rappels, Telegram, WhatsApp, téléphone, plugin ChatGPT, autres
+fournisseurs de modèles. Ces pistes pourront être réexaminées à partir des retours des testeurs.
 
 ## Suite retenue : Notion
 

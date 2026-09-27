@@ -1,15 +1,24 @@
 # La Bulle : Hodge Podge
 
-Un espace pour réfléchir avec un coach, puis prolonger cette réflexion par une action concrète.
-Projet du hackathon X-IA, construit avec OpenAI et Cloudflare.
+Un temps pour réfléchir, puis une façon de donner suite à ses idées.
+
+Projet de l’équipe Hodge Podge pour le hackathon X-IA, construit avec OpenAI et Cloudflare.
+
+La Bulle aide à prendre du recul face à une situation professionnelle : une conversation à préparer,
+une décision difficile, une idée à démêler. Le coach IA accompagne la réflexion, une question à la
+fois. L’après-bulle permet ensuite de retrouver ce qui en ressort et d’agir dans ses outils du
+quotidien. L’interface reste simple ; les agents travaillent en coulisses, et la personne garde la
+main.
 
 ## Deux usages
 
 ### La Bulle : le coaching
 
-Le parcours principal : échanger par messages ou appel vocal, en français ou en anglais. Le coach
-suit le protocole Kedo, une question à la fois. La personne choisit les notes à garder pour
-reprendre le fil à la prochaine séance.
+Par messages ou appel vocal, en français ou en anglais, la personne dispose d’un espace pour
+réfléchir à son rythme. Le coach suit le protocole de micro-coaching Kedo, apporté par Séb, coach de
+dirigeants. Il laisse de la place aux silences et s’adapte quand la personne souhaite revenir sur
+une question ou prendre son temps. Elle choisit les notes à garder pour reprendre le fil à la
+prochaine séance. Repartir avec une idée plus claire suffit ; une action n’est pas obligatoire.
 
 ### L’après-bulle : passer à l’action
 
@@ -18,12 +27,27 @@ points à préciser. Il peut être copié vers n’importe quel assistant ou env
 sans la retranscription complète. Le questionnaire de retour est juste en dessous.
 
 Pour aller plus loin, la personne peut connecter Notion. Le récap devient son intention ; elle peut
-ajouter une précision et choisir quelques pages. Trois agents examinent les documents, vérifient
-les conclusions et préparent une proposition concrète. La personne la relit, la modifie et choisit
-de publier une nouvelle page dans Notion.
+ajouter une précision et choisir quelques pages. Trois agents examinent les documents, vérifient les
+conclusions et préparent une proposition concrète. La personne la relit, la modifie et choisit de
+publier une nouvelle page dans Notion.
 
 Le bouton **L’après-bulle** est accessible dès l’accueil. Aucune connexion Notion n’est nécessaire
 pour le coaching ou le récap. La transcription n’est jamais jointe à l’analyse Notion.
+
+## Les agents derrière le parcours
+
+Le coach suit le fil de la conversation et traite les demandes de la personne. Dans Notion, trois
+agents prennent ensuite le relais, chacun avec un rôle précis :
+
+1. **Explorer** les pages choisies et relever les éléments qui éclairent l’intention de la personne.
+2. **Vérifier** les conclusions à partir des sources. Si elles ne sont pas assez étayées, arrêter la
+   préparation et demander du contexte.
+3. **Préparer** une proposition à discuter : une trame de réunion, une règle de décision ou une
+   clarification des responsabilités.
+
+La personne relit et peut modifier la proposition avant de publier une nouvelle page dans Notion.
+Les documents existants ne sont pas modifiés. Voir [l’architecture](docs/architecture.md) pour le
+fonctionnement et [le positionnement](docs/positionnement.md) pour un exemple de parcours complet.
 
 ## Essayer
 
@@ -37,8 +61,8 @@ séparément du dépôt. Chaque navigateur reçoit son espace personnel.
 
 Un lien d’invitation peut ouvrir directement cet espace :
 `https://bulle.hodge-podge.workers.dev/#access=CODE_ENCODE`. Remplacer `CODE_ENCODE` par la valeur
-encodée de `APP_ACCESS_CODE`. Le fragment est retiré immédiatement de l’URL puis le code est
-vérifié par le serveur. Ce lien donne accès aux essais : le partager avec les personnes invitées.
+encodée de `APP_ACCESS_CODE`. Le fragment est retiré immédiatement de l’URL puis le code est vérifié
+par le serveur. Ce lien donne accès aux essais : le partager avec les personnes invitées.
 
 1. Écrire une situation dans le champ de message et entrer le code d’accès.
 2. Envoyer le message, ou choisir **Appeler** et autoriser le microphone.
@@ -46,7 +70,8 @@ vérifié par le serveur. Ce lien donne accès aux essais : le partager avec les
    directement. Tu peux revenir à une question précédente ou demander une pause. Par défaut, le
    coach attend 20 secondes avant de demander s’il peut continuer. Aucun bouton de prise de parole.
 4. À la fin du script ou après **Raccrocher**, l’après-bulle s’ouvre après la sauvegarde. Pour un
-   échange écrit, le coach peut clore la bulle ; le bouton **Terminer ma bulle** permet aussi de finir.
+   échange écrit, le coach peut clore la bulle ; le bouton **Terminer ma bulle** permet aussi de
+   finir.
 5. Modifier le récap, le copier ou se l’envoyer, puis donner son avis si on le souhaite.
 6. Revenir au coach pour une **Nouvelle séance**. Les notes enregistrées avec **Garder quelques
    notes** restent la mémoire approuvée du coach ; le récap ne les remplace pas automatiquement.
@@ -83,8 +108,9 @@ Notion](docs/notion.md). Sans cette configuration, le coach fonctionne normaleme
 Le guide détaille aussi les agents, les limites de lecture et les essais à réaliser. La migration
 `0005_after_bubble.sql` ajoute les récaps, les retours des bulles écrites et le suivi des envois.
 
-L’email utilise Resend avec un domaine vérifié : voir [le guide de l’après-bulle](docs/apres-bulle.md).
-Sans configuration email, le récap, la copie, le questionnaire et Notion restent disponibles.
+L’email utilise Resend avec un domaine vérifié : voir [le guide de
+l’après-bulle](docs/apres-bulle.md). Sans configuration email, le récap, la copie, le questionnaire
+et Notion restent disponibles.
 
 ```sh
 npm run check
@@ -158,8 +184,7 @@ L’agent vocal reçoit le fil récent et les notes approuvées. Realtime gère 
 parole et les interruptions avec `semantic_vad`. Les 14 questions du PDF sont dans les instructions
 du modèle, qui doit les suivre dans l’ordre et mot pour mot, sauf demande explicite de répétition,
 explication, retour en arrière, temps, passage de question, arrêt ou envie de passer à l’action.
-Le logiciel ne prétend ni lire un agenda ni envoyer un rappel. L’agenda, Telegram et les autres fournisseurs restent hors
-de cette version.
+L’agenda, les rappels, Telegram et les autres fournisseurs restent hors de cette version.
 
 ## Coaching en français et anglais
 
@@ -217,11 +242,13 @@ Voir [le guide des essais](docs/essais.md).
 
 | Document | Contenu |
 |---|---|
-| [L’idée](docs/positionnement.md) | Parcours et exemple Camille/Alex, sans jargon |
+| [Positionnement](docs/positionnement.md) | Les deux usages, leur intérêt et un parcours concret |
 | [Architecture](docs/architecture.md) | Modèles, échanges, stockage et logique agentique |
+| [L’après-bulle](docs/apres-bulle.md) | Récap, email et questionnaire |
+| [Notion](docs/notion.md) | Connexion, trois agents et publication |
 | [Silences](docs/silence.md) | Comportements et tests à faire avec Séb |
 | [Plan](docs/plan.md) | Travail fait et prochaine étape pour chacun |
-| [Soumission](docs/soumission.md) | Description, vidéo de deux minutes et dépôt |
+| [Soumission](docs/soumission.md) | Texte de présentation validé, vidéo de deux minutes et dépôt |
 | [Décisions et sources](docs/decisions-et-sources.md) | Choix et références |
 
 Ce dépôt est le point central pour les trois membres. Les documents sont modifiables depuis GitHub.
