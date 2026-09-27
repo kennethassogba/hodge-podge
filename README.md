@@ -252,6 +252,10 @@ Voir [le guide des essais](docs/essais.md).
 
 ## Dossier d’équipe
 
+Le partage du lien affiche une carte Open Graph, avec un visuel commun à l’accueil et à l’après-bulle.
+Les métadonnées sont présentes dans le HTML, sans JavaScript ni connexion. Le visuel se régénère avec
+`python3 scripts/social-card.py` (Pillow requis), en utilisant la police Manrope du projet.
+
 | Document | Contenu |
 |---|---|
 | [Positionnement](docs/positionnement.md) | Les deux usages, leur intérêt et un parcours concret |
