@@ -1,4 +1,4 @@
-import {t,getLanguage,initLanguage,setLanguage} from './i18n.js?v=0.5.1';
+import {t,getLanguage,initLanguage,setLanguage} from './i18n.js?v=0.5.2';
 initLanguage(document);
 const $=id=>document.getElementById(id);
 let entries=[],nextOffset=null,summary=null,ratings=null;

@@ -64,6 +64,9 @@ test('voice session uses native automatic turn-taking and closes only for its ow
   assert.equal(voiceConfig.audio.input.turn_detection.create_response,true);
   assert.equal(voiceConfig.audio.input.turn_detection.type,'semantic_vad');
   assert.equal(voiceConfig.audio.input.turn_detection.interrupt_response,true);
+  assert.equal(voiceConfig.max_output_tokens,2048);
+  assert.equal((await request('call/diagnostic',{cookie:cookieB,data:{callId:result.data.callId,status:'incomplete',reason:'max_output_tokens'}})).status,404);
+  assert.equal((await request('call/diagnostic',{data:{callId:result.data.callId,status:'incomplete',reason:'max_output_tokens',retryScheduled:true,transcript:'Private data must be dropped',message:'Private provider message'}})).status,200);
   assert.equal(voiceConfig.tools.some(t=>t.name==='pause_coaching'),false); // Cached clients cannot execute this tool.
   assert.equal((await request('call',{data:{threadId:threadA,sdp:'v=0\r\n'}})).status,409);
   assert.equal((await request('call/end',{cookie:cookieB,data:{callId:result.data.callId,messages:[]}})).status,404);

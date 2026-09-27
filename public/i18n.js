@@ -1,4 +1,5 @@
 export const EN = {
+  'Le coach reprend sa réponse…':'The coach is resuming…',
   'Prends ton temps.':'Take your time.',
   'Terminer ma bulle':'Finish my bubble',
   "Explorer La Bulle":"Explore La Bulle",

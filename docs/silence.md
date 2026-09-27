@@ -40,6 +40,24 @@ onglets ouverts avec une ancienne version de l’application.
 Par écrit, le coach accepte aussi les retours et les pauses, puis attend le prochain message ; il
 n’envoie pas de relance chronométrée.
 
+## Réponses interrompues et reprise
+
+La limite de sortie vocale est de 2 048 tokens par réponse ; les consignes continuent de demander
+une seule question courte. L’ancien plafond de 300 tokens pouvait couper une explication parlée.
+
+Le navigateur lit `response.status_details`. Une réponse tronquée par `max_output_tokens` ou une
+panne `server_error` déclenche au maximum une reprise par tour, avec un plafond de 4 096 tokens.
+La sortie inachevée est retirée du contexte Realtime et de la transcription, puis la même demande
+est relancée. L’accueil, l’accusé de réception d’une pause et la clôture gardent leurs consignes.
+Toute nouvelle prise de parole annule la reprise prévue. Une interruption normale n’est pas une
+panne. Les refus du filtre de contenu et les erreurs de quota ne sont pas retentés.
+
+Si la reprise échoue aussi, l’appel se ferme proprement et conserve les échanges reçus. Le navigateur
+transmet les catégories techniques à `/api/call/diagnostic`, uniquement pour son propre appel.
+Les logs Cloudflare `voice_response_issue` contiennent des catégories autorisées, le nombre de tokens
+et l’indication de reprise prévue. Aucun texte, audio ou message brut du fournisseur n’y est ajouté.
+Ces journaux suivent l’échantillonnage configuré ; ils ne sont pas un historique exhaustif.
+
 ## Vérification
 
 Les tests de `tests/voice-ui.test.js` exécutent le vrai contrôleur avec des événements WebRTC fictifs.
@@ -66,3 +84,7 @@ frontend avec un microphone synthétique dans le navigateur.
 
 [Détection native](https://developers.openai.com/api/docs/guides/realtime-vad) ·
 [Outils Realtime](https://developers.openai.com/api/docs/guides/realtime-mcp)
+
+`scripts/check-voice-recovery.py` reproduit, sur le modèle réel et avec une explication fictive, une
+réponse audio tronquée à 300 tokens, puis sa reprise complète dans la même session. Ce contrôle
+facultatif est payant et nécessite le même environnement Python que les autres contrôles Realtime.

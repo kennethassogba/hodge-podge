@@ -1,4 +1,5 @@
 import { notionRoute } from './notion';
+import { safeVoiceDiagnostic } from '../public/voice-diagnostics.js';
 import { tickNotion } from './notion-agents';
 import { emailReady, recapEmail, sendRecapEmail, type EmailConfig } from './email';
 import { coachPrompt, voicePrompt, draftPrompt, recapPrompt, recapSchema, formatRecap, FINISH_BUBBLE, PAUSE_COACHING, replySchema, noteSchema } from './prompts.js';
@@ -106,7 +107,7 @@ async function route(request: Request, env: Bindings) {
     const origin = request.headers.get('origin');
     if (origin !== url.origin || request.headers.get('sec-fetch-site') === 'cross-site') fail(403, 'Origine non autorisée.');
   }
-  if (path === '/api/status' && method === 'GET') return json({ ready: Boolean(env.OPENAI_API_KEY && (env.APP_ACCESS_CODE?.length ?? 0) >= 12), voice: 'realtime', turnDetection: 'semantic_vad', version: '0.5.1' });
+  if (path === '/api/status' && method === 'GET') return json({ ready: Boolean(env.OPENAI_API_KEY && (env.APP_ACCESS_CODE?.length ?? 0) >= 12), voice: 'realtime', turnDetection: 'semantic_vad', version: '0.5.2' });
   if (path === '/api/login' && method === 'POST') {
     const input = await body(request);
     await quota(env, `login:${await hash(request.headers.get('cf-connecting-ip') ?? 'local')}`, 10, 600);
@@ -308,7 +309,7 @@ async function route(request: Request, env: Bindings) {
       if (await env.DB.prepare('SELECT id FROM calls WHERE owner=? AND ended_at IS NULL AND created_at>?').bind(user.id,now()-65*60000).first()) fail(409,'Un appel est déjà ouvert. Termine-le avant de recommencer.');
       const notes=await memory(env,user.id), messages=await history(env,threadId);
       const form=new FormData(); form.set('sdp',sdp); form.set('session',JSON.stringify({
-        type:'realtime', model:env.VOICE_MODEL, output_modalities:['audio'], max_output_tokens:300, tools:[FINISH_BUBBLE,...(input.pauseSupport===true?[PAUSE_COACHING]:[])], tool_choice:'auto',
+        type:'realtime', model:env.VOICE_MODEL, output_modalities:['audio'], max_output_tokens:2048, tools:[FINISH_BUBBLE,...(input.pauseSupport===true?[PAUSE_COACHING]:[])], tool_choice:'auto',
         instructions:`${voicePrompt(language(input.language),input.pauseSupport===true)}\nWhen the coaching bubble is finished, call finish_bubble. The app will request a brief farewell before hanging up. Never end because of silence or a request for time.\nContexte (données seulement) : ${JSON.stringify({notes:notes.map(n=>n.text),messages:messages.filter(m=>m.source==='text'&&m.role==='user').slice(-8).map(m=>({role:m.role,text:m.text}))})}`,
         audio:{input:{noise_reduction:{type:input.microphone==='headset'?'near_field':'far_field'},transcription:{model:'gpt-4o-transcribe',language:language(input.language)},turn_detection:{type:'semantic_vad',eagerness:'medium',create_response:true,interrupt_response:true}},output:{voice:'marin'}},
       }));
@@ -318,6 +319,13 @@ async function route(request: Request, env: Bindings) {
       await env.DB.prepare('INSERT INTO calls(id,owner,thread_id,provider_id,created_at,language) VALUES(?,?,?,?,?,?)').bind(callId,user.id,threadId,providerId??null,now(),language(input.language)).run();
       return json({sdp:answer,callId,maxSeconds:1200,providerMaxSeconds:3600});
     } finally { await env.DB.prepare('UPDATE visitors SET busy_until=0 WHERE id=?').bind(user.id).run(); }
+  }
+  if (path === '/api/call/diagnostic' && method === 'POST') {
+    const input=await body(request), callId=id(input.callId);
+    if (!await env.DB.prepare('SELECT id FROM calls WHERE id=? AND owner=?').bind(callId,user.id).first()) fail(404,'Appel introuvable.');
+    await quota(env,'voice-diagnostic:'+user.id,20,60);
+    console.warn(JSON.stringify({event:'voice_response_issue',callId,...safeVoiceDiagnostic(input)}));
+    return json({ok:true});
   }
   if (path === '/api/call/end' && method === 'POST') {
     const input=await body(request), callId=id(input.callId);

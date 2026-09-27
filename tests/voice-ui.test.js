@@ -290,3 +290,112 @@ test('hangup and the twenty-minute limit cancel even an indefinite pause',async(
     }finally{s.close();}
   }
 });
+
+function failedResponse(s,id,{status='incomplete',reason='max_output_tokens',code,output=[]}={}){
+  s.emit({type:'response.done',response:{id,status,status_details:{reason,error:code?{code}:undefined},output,usage:{output_tokens:300}}});
+}
+test('a truncated response is retried once without hanging up or advancing from partial output',async()=>{
+  const s=await setup();try{
+    s.question(0);
+    s.emit({type:'input_audio_buffer.speech_started',item_id:'answer'});
+    s.emit({type:'input_audio_buffer.speech_stopped',item_id:'answer'});
+    s.emit({type:'response.created',response:{id:'truncated'}});
+    s.emit({type:'response.output_item.added',item:{id:'partial-question',role:'assistant'}});
+    s.emit({type:'output_audio_buffer.started',response_id:'truncated'});
+    s.emit({type:'response.output_audio_transcript.done',response_id:'truncated',item_id:'partial-question',transcript:'Quelles sont les…'});
+    const output=[{id:'partial-question',type:'message',role:'assistant'}];
+    failedResponse(s,'truncated',{output});failedResponse(s,'truncated',{output}); // Duplicate events cannot exhaust the retry budget.
+    assert.equal(s.document.getElementById('call-panel').hidden,false);
+    assert.equal(s.http.filter(r=>r.path==='/api/call/end').length,0);
+    assert(s.sent.some(e=>e.type==='conversation.item.delete'&&e.item_id==='partial-question'));
+    s.tick(250);const retry=s.requests().at(-1);
+    assert.equal(s.requests().length,2);assert.equal(retry.response.max_output_tokens,4096);
+    assert.equal(retry.response.instructions,undefined); // Session protocol remains authoritative.
+    s.emit({type:'response.created',response:{id:'recovered',metadata:retry.response.metadata}});
+    s.emit({type:'response.output_item.added',item:{id:'complete-question',role:'assistant'}});
+    s.emit({type:'response.output_audio_transcript.done',response_id:'recovered',item_id:'complete-question',transcript:QUESTIONS[1]});
+    s.emit({type:'response.done',response:{id:'recovered',status:'completed'}});
+    s.emit({type:'output_audio_buffer.stopped',response_id:'recovered'});
+    s.document.getElementById('hangup-button').click();await s.settle();
+    const ending=s.http.find(r=>r.path==='/api/call/end').data;
+    assert(!ending.messages.some(m=>m.text==='Quelles sont les…'));assert(ending.messages.some(m=>m.text===QUESTIONS[1]));
+    const diagnostic=s.http.find(r=>r.path==='/api/call/diagnostic').data;
+    assert.equal(diagnostic.reason,'max_output_tokens');assert.equal(diagnostic.retryScheduled,true);
+    assert.doesNotMatch(JSON.stringify(diagnostic),/Quelles sont|Bienvenue/);
+  }finally{s.close();}
+});
+test('a transient provider error retries once; repeated failure terminates cleanly without a loop',async()=>{
+  const s=await setup();try{
+    s.question(0);s.emit({type:'response.created',response:{id:'server-failure'}});
+    failedResponse(s,'server-failure',{status:'failed',code:'server_error'});
+    s.tick(999);assert.equal(s.requests().length,1);s.tick(1);
+    const retry=s.requests().at(-1);assert.equal(s.requests().length,2);
+    s.emit({type:'response.created',response:{id:'failed-retry',metadata:retry.response.metadata}});
+    failedResponse(s,'failed-retry',{status:'failed',code:'server_error'});await s.settle();
+    assert.equal(s.document.getElementById('call-panel').hidden,true);assert.equal(s.track.stopped,true);
+    s.tick(5000);await s.settle();assert.equal(s.requests().length,2);
+    assert.equal(s.http.filter(r=>r.path==='/api/call/end').length,1);
+  }finally{s.close();}
+});
+test('content filtering and quota failures are not retried',async()=>{
+  for(const failure of [{reason:'content_filter'},{status:'failed',code:'insufficient_quota'}]){
+    const s=await setup();try{
+      s.question(0);s.emit({type:'response.created',response:{id:'non-retryable'}});
+      failedResponse(s,'non-retryable',{reason:undefined,...failure});await s.settle();
+      s.tick(2000);assert.equal(s.requests().length,1);
+      assert.equal(s.document.getElementById('call-panel').hidden,true);
+    }finally{s.close();}
+  }
+});
+test('resuming speech cancels a pending recovery, including a response created late',async()=>{
+  for(const createdLate of [false,true]){
+    const s=await setup();try{
+      s.question(0);s.emit({type:'response.created',response:{id:'failed-old-turn'}});
+      failedResponse(s,'failed-old-turn');
+      if(createdLate)s.tick(250);
+      const pending=s.requests().at(-1);
+      s.emit({type:'input_audio_buffer.speech_started',item_id:'resumed'});
+      if(createdLate){
+        s.emit({type:'response.created',response:{id:'late-retry',metadata:pending.response.metadata}});
+        assert(s.sent.some(e=>e.type==='response.cancel'&&e.response_id==='late-retry'));
+      }
+      s.emit({type:'input_audio_buffer.speech_stopped',item_id:'resumed'});s.question(1);
+      s.tick(2000);await s.settle();assert.equal(s.requests().length,createdLate?2:1);
+      assert.equal(s.document.getElementById('call-panel').hidden,false);
+    }finally{s.close();}
+  }
+});
+test('recovery preserves the greeting, pause acknowledgement and farewell purpose',async()=>{
+  for(const kind of ['greeting','pause','farewell']){
+    const s=await setup();try{
+      let request=s.requests()[0];
+      if(kind==='pause'){s.question(0);request=pauseRequest(s);}
+      if(kind==='farewell'){requestFinish(s);request=s.requests().at(-1);}
+      s.emit({type:'response.created',response:{id:'special-response',metadata:request.response.metadata}});
+      failedResponse(s,'special-response');s.tick(250);
+      const retry=s.requests().at(-1);assert.equal(retry.response.instructions,request.response.instructions);
+      assert.equal(retry.response.tool_choice,request.response.tool_choice);
+      s.emit({type:'response.created',response:{id:'special-retry',metadata:retry.response.metadata}});
+      s.emit({type:'output_audio_buffer.started',response_id:'special-retry'});
+      s.emit({type:'response.done',response:{id:'special-retry',status:'completed'}});
+      s.emit({type:'output_audio_buffer.stopped',response_id:'special-retry'});
+      if(kind==='pause'){
+        s.tick(19999);assert.notEqual(s.requests().at(-1).response.metadata.pause_kind,'check');
+        s.tick(1);assert.equal(s.requests().at(-1).response.metadata.pause_kind,'check');
+      }
+      if(kind==='farewell'){s.tick(450);await s.settle();assert.equal(s.document.getElementById('call-panel').hidden,true);}
+    }finally{s.close();}
+  }
+});
+
+test('a late failure from the previous turn neither hangs up nor removes the new-turn timeout',async()=>{
+  const s=await setup();try{
+    s.question(0);s.emit({type:'response.created',response:{id:'old-failure'}});
+    s.emit({type:'input_audio_buffer.speech_started',item_id:'new-answer'});
+    s.emit({type:'input_audio_buffer.speech_stopped',item_id:'new-answer'});
+    failedResponse(s,'old-failure');await s.settle();
+    s.tick(1000);assert.equal(s.requests().length,1);assert.equal(s.document.getElementById('call-panel').hidden,false);
+    s.tick(29000);await s.settle();assert.equal(s.document.getElementById('call-panel').hidden,true);
+    assert.match(s.document.getElementById('error').textContent,/ne répond plus/);
+  }finally{s.close();}
+});

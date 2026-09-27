@@ -1,6 +1,7 @@
-import { takeAccessCode, afterLink, goAfter } from './access.js?v=0.5.1';
-import { QUESTIONS, QUESTIONS_EN } from './coaching-protocol.js?v=0.5.1';
-import { t, getLanguage, initLanguage, setLanguage } from './i18n.js?v=0.5.1';
+import { takeAccessCode, afterLink, goAfter } from './access.js?v=0.5.2';
+import { voiceResponseDiagnostic } from './voice-diagnostics.js?v=0.5.2';
+import { QUESTIONS, QUESTIONS_EN } from './coaching-protocol.js?v=0.5.2';
+import { t, getLanguage, initLanguage, setLanguage } from './i18n.js?v=0.5.2';
 const invitationCode = takeAccessCode();
 initLanguage(document);
 
@@ -109,6 +110,40 @@ $('erase-button').onclick=()=>guard(async()=>{
 });
 
 function send(c,event) {if(call===c && c.channel?.readyState==='open')c.channel.send(JSON.stringify(event));}
+function requestResponse(c,response={},eventId) {
+  const key=crypto.randomUUID();c.requests.set(key,response);
+  send(c,{type:'response.create',event_id:eventId||`coach-request-${key}`,response:{...response,
+    metadata:{...response.metadata,client_request_id:key,client_turn:String(c.turn)}}});
+  clearTimeout(c.responseTimer);
+  c.responseTimer=setTimeout(()=>{if(call===c)void endCall(t('Le service vocal ne répond plus. Tu peux relancer l’appel.'));},45000);
+}
+function recoverResponse(c,response) {
+  const issue=voiceResponseDiagnostic(response);
+  const interruptedTurn=c.speaking||c.responseTurn!==c.turn;
+  const recoverable=(issue.status==='incomplete'&&issue.reason==='max_output_tokens')||(issue.status==='failed'&&issue.code==='server_error');
+  const retry=!interruptedTurn&&recoverable&&c.recoveryAttempts<1;
+  // Reporting is best effort and must never hold up audio recovery.
+  if(c.callId)void api('call/diagnostic',{callId:c.callId,...issue,retryScheduled:retry}).catch(()=>{});
+  if(interruptedTurn||['turn_detected','client_cancelled'].includes(issue.reason))return;
+  if(!retry){void endCall(t('Le service vocal n’a pas pu terminer sa réponse. Tu peux relancer l’appel.'));return;}
+  c.recoveryAttempts++;
+  const turn=c.turn,spec=c.responseSpec||{},closing=c.closingResponse===response.id;
+  c.ignoredResponses.add(response.id);
+  if(c.playing)send(c,{type:'output_audio_buffer.clear',event_id:`recovery-clear-${response.id}`});
+  c.playing=false;
+  // Remove the unfinished output so the model retries the same turn, not the next protocol question.
+  for(const item of response.output||[]){
+    if(!item.id)continue;
+    c.currentItems.delete(item.id);c.transcript.delete(item.id);
+    send(c,{type:'conversation.item.delete',event_id:`recovery-delete-${item.id}`,item_id:item.id});
+  }
+  callStatus(c,t('Le coach reprend sa réponse…'));
+  c.recoveryTimer=setTimeout(()=>{
+    if(call!==c||c.speaking||c.turn!==turn||c.responseId!==response.id)return;
+    if(closing)c.expectClosing=true;
+    requestResponse(c,{...spec,max_output_tokens:4096,metadata:{...spec.metadata,recovery:'1'}});
+  },issue.code==='server_error'?1000:250);
+}
 function callStatus(c,label,speaking=false){
   if(call!==c)return;
   $('call-status').textContent=t(label);
@@ -133,10 +168,10 @@ function pauseSpeech(c,kind) {
   const phrase=kind==='ack'
     ? (getLanguage()==='en'?'Of course, take your time.':'Bien sûr, prends ton temps.')
     : (getLanguage()==='en'?'Are you ready to continue?':'Est-ce qu’on peut continuer ?');
-  send(c,{type:'response.create',event_id:`pause-request-${pause.id}-${kind}`,response:{
+  requestResponse(c,{
     tool_choice:'none',metadata:{pause_id:pause.id,pause_kind:kind},
     instructions:`Say only this sentence, then wait without asking a protocol question: ${phrase}`,
-  }});
+  },`pause-request-${pause.id}-${kind}`);
   clearTimeout(c.responseTimer);
   c.responseTimer=setTimeout(()=>{if(call===c&&c.pause===pause)void endCall(t('Le service vocal ne répond plus. Tu peux relancer l’appel.'));},45000);
 }
@@ -167,6 +202,7 @@ function handleEvent(c,e) {
   if(call!==c)return;
   if(e.response_id&&c.ignoredResponses.has(e.response_id))return;
   if(e.type==='input_audio_buffer.speech_started'){
+    clearTimeout(c.recoveryTimer);c.recoveryAttempts=0;
     c.turn++;cancelPause(c);
     clearTimeout(c.finishTimer);c.closingDone=false;c.closingResponse=null;c.expectClosing=false;
     if(c.playing)c.interruptions++;
@@ -184,11 +220,13 @@ function handleEvent(c,e) {
     error(t('Un passage n’a pas pu être transcrit. La conversation continue.'),'info');
   }else if(e.type==='response.created'){
     const meta=e.response.metadata;
-    if(meta?.pause_id&&meta.pause_id!==c.pause?.id){
+    const spec=c.requests.get(meta?.client_request_id)||{};c.requests.delete(meta?.client_request_id);
+    if((meta?.pause_id&&meta.pause_id!==c.pause?.id)||(meta?.client_turn!==undefined&&Number(meta.client_turn)!==c.turn)){
       c.ignoredResponses.add(e.response.id);
       send(c,{type:'response.cancel',event_id:`pause-cancel-${e.response.id}`,response_id:e.response.id});return;
     }
     clearTimeout(c.responseTimer);c.responseId=e.response.id;c.responseSpoken=false;
+    c.responseSpec=spec;
     c.responseTurn=c.turn;
     if(meta?.pause_kind==='ack'&&c.pause)c.pause.ackResponse=e.response.id;
     if(c.expectClosing){c.closingResponse=e.response.id;c.expectClosing=false;}
@@ -205,7 +243,13 @@ function handleEvent(c,e) {
   }else if(e.type==='output_audio_buffer.stopped'){
     c.playing=false;c.currentItems.clear();callStatus(c,t('Je t’écoute.'),c.speaking);finishWhenQuiet(c);waitForPause(c);
   }else if(e.type==='response.done'){
-    if(e.response?.id!==c.responseId)return;
+    if(e.response?.id!==c.responseId||c.doneResponses.has(e.response.id))return;
+    c.doneResponses.add(e.response.id);
+    if(c.responseTurn!==c.turn){
+      for(const item of e.response.output||[])if(item.type==='function_call')send(c,{type:'conversation.item.create',item:{type:'function_call_output',call_id:item.call_id,output:'This response was cancelled because the person resumed.'}});
+      if(['failed','incomplete'].includes(e.response.status))recoverResponse(c,e.response);
+      return;
+    }
     clearTimeout(c.responseTimer);
     const pause=e.response.output?.find(item=>item.type==='function_call'&&item.name==='pause_coaching');
     if(e.response.status==='completed'&&pause){beginPause(c,pause);return;}
@@ -215,16 +259,18 @@ function handleEvent(c,e) {
       send(c,{type:'conversation.item.create',item:{type:'function_call_output',call_id:finish.call_id,output:'The bubble will close after your brief farewell.'}});
       if(c.responseSpoken){c.closingDone=true;finishWhenQuiet(c);}else{
       c.expectClosing=true;
-      send(c,{type:'response.create',response:{tool_choice:'none',instructions:getLanguage()==='en'?'Say only: Thank you for this time together. Take care.':'Dis uniquement : Merci pour ce moment partagé. Bonne continuation.'}});
+      requestResponse(c,{tool_choice:'none',instructions:getLanguage()==='en'?'Say only: Thank you for this time together. Take care.':'Dis uniquement : Merci pour ce moment partagé. Bonne continuation.'});
       }
     }
     if(e.response.status==='completed'&&e.response.id===c.closingResponse){c.closingDone=true;finishWhenQuiet(c);}
     if(e.response.status==='failed'||e.response.status==='incomplete'){
-      void endCall(t('Le service vocal n’a pas pu terminer sa réponse. Tu peux relancer l’appel.'));
+      recoverResponse(c,e.response);
     }
   }else if(e.type==='error'){
     // A readiness request can race a new native turn; cancelling an already-ended response is benign.
     if(e.error?.event_id?.startsWith('pause-cancel-'))return;
+    if(e.error?.event_id?.startsWith('recovery-delete-')&&e.error?.code==='item_not_found')return;
+    if(e.error?.event_id?.startsWith('coach-request-')&&e.error?.code==='conversation_already_has_active_response')return;
     if(e.error?.event_id?.startsWith('pause-request-')&&e.error?.code==='conversation_already_has_active_response'){cancelPause(c);return;}
     console.warn('voice_error',e.error?.code||'unknown');
     void endCall(t('La connexion vocale a rencontré une erreur. Tu peux relancer l’appel.'));
@@ -235,7 +281,7 @@ async function startCall(){
   if(!navigator.mediaDevices?.getUserMedia)throw new Error(t('Le micro nécessite HTTPS ou localhost et un navigateur compatible.'));
   busy=true;updateControls();
   try{await ensureThread();}finally{busy=false;updateControls();}
-  const c={peer:new RTCPeerConnection(),audio:new Audio(),stream:null,channel:null,callId:null,sequence:0,transcript:new Map(),currentItems:new Set(),ignoredResponses:new Set(),turn:0,responseTurn:0,pause:null,responseId:null,speaking:false,playing:false,ending:false,interruptions:0,transcriptionFailures:0};
+  const c={peer:new RTCPeerConnection(),audio:new Audio(),stream:null,channel:null,callId:null,sequence:0,transcript:new Map(),currentItems:new Set(),ignoredResponses:new Set(),doneResponses:new Set(),requests:new Map(),recoveryAttempts:0,turn:0,responseTurn:0,pause:null,responseId:null,speaking:false,playing:false,ending:false,interruptions:0,transcriptionFailures:0};
   call=c;render();$('call-panel').hidden=false;$('call-status').textContent=t('Autorise le micro pour commencer.');$('call-time').textContent='00:00';
   c.audio.autoplay=true;
   try{
@@ -251,7 +297,8 @@ async function startCall(){
       c.ticker=setInterval(()=>{const seconds=Math.floor((Date.now()-c.started)/1000);$('call-time').textContent=`${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`;if(seconds>=1200)void endCall(t('Les vingt minutes sont écoulées. Tu peux garder quelques notes.'),'ended');},1000);
       // Native VAD creates all later responses; the client only requests the greeting.
       const greeting=(getLanguage()==='en'?QUESTIONS_EN:QUESTIONS)[0];
-      send(c,{type:'response.create',response:{instructions:`This is a new coaching call. Say only this exact opening, without introduction or extra words: ${greeting}`}});
+      requestResponse(c,{instructions:`This is a new coaching call. Say only this exact opening, without introduction or extra words: ${greeting}`});
+      clearTimeout(c.responseTimer);
       c.responseTimer=setTimeout(()=>{if(call===c)void endCall(t('Le coach ne répond pas. Tu peux relancer l’appel.'));},20000);
     };
     c.channel.onclose=()=>{if(call===c&&!c.ending)void endCall(t('La connexion audio a été fermée.'));};
@@ -272,6 +319,7 @@ async function saveCall(){
 async function endCall(message='',outcome=message?'error':'ended'){
   const c=call;if(!c||c.ending)return;c.ending=true;
   cancelPause(c);
+  clearTimeout(c.recoveryTimer);
   clearTimeout(c.finishTimer);clearInterval(c.ticker);clearTimeout(c.limitTimer);clearTimeout(c.connectionTimer);clearTimeout(c.responseTimer);
   // Reset the UI first. A failed transport cleanup must never leave the call stuck.
   call=null;$('call-panel').hidden=true;
