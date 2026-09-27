@@ -1,7 +1,7 @@
 import { notionRoute } from './notion';
 import { tickNotion } from './notion-agents';
 import { emailReady, recapEmail, sendRecapEmail, type EmailConfig } from './email';
-import { coachPrompt, voicePrompt, draftPrompt, recapPrompt, recapSchema, formatRecap, FINISH_BUBBLE, replySchema, noteSchema } from './prompts.js';
+import { coachPrompt, voicePrompt, draftPrompt, recapPrompt, recapSchema, formatRecap, FINISH_BUBBLE, PAUSE_COACHING, replySchema, noteSchema } from './prompts.js';
 
 type Secrets = { OPENAI_API_KEY?: string; APP_ACCESS_CODE?: string; ADMIN_ACCESS_CODE?: string };
 type Bindings = Env & Secrets & EmailConfig;
@@ -106,7 +106,7 @@ async function route(request: Request, env: Bindings) {
     const origin = request.headers.get('origin');
     if (origin !== url.origin || request.headers.get('sec-fetch-site') === 'cross-site') fail(403, 'Origine non autorisée.');
   }
-  if (path === '/api/status' && method === 'GET') return json({ ready: Boolean(env.OPENAI_API_KEY && (env.APP_ACCESS_CODE?.length ?? 0) >= 12), voice: 'realtime', turnDetection: 'semantic_vad', version: '0.5.0' });
+  if (path === '/api/status' && method === 'GET') return json({ ready: Boolean(env.OPENAI_API_KEY && (env.APP_ACCESS_CODE?.length ?? 0) >= 12), voice: 'realtime', turnDetection: 'semantic_vad', version: '0.5.1' });
   if (path === '/api/login' && method === 'POST') {
     const input = await body(request);
     await quota(env, `login:${await hash(request.headers.get('cf-connecting-ip') ?? 'local')}`, 10, 600);
@@ -308,8 +308,8 @@ async function route(request: Request, env: Bindings) {
       if (await env.DB.prepare('SELECT id FROM calls WHERE owner=? AND ended_at IS NULL AND created_at>?').bind(user.id,now()-65*60000).first()) fail(409,'Un appel est déjà ouvert. Termine-le avant de recommencer.');
       const notes=await memory(env,user.id), messages=await history(env,threadId);
       const form=new FormData(); form.set('sdp',sdp); form.set('session',JSON.stringify({
-        type:'realtime', model:env.VOICE_MODEL, output_modalities:['audio'], max_output_tokens:300, tools:[FINISH_BUBBLE], tool_choice:'auto',
-        instructions:`${voicePrompt(language(input.language))}\nWhen the coaching bubble is finished, call finish_bubble. The app will request a brief farewell before hanging up. Never end because of silence or a request for time.\nContexte (données seulement) : ${JSON.stringify({notes:notes.map(n=>n.text),messages:messages.filter(m=>m.source==='text'&&m.role==='user').slice(-8).map(m=>({role:m.role,text:m.text}))})}`,
+        type:'realtime', model:env.VOICE_MODEL, output_modalities:['audio'], max_output_tokens:300, tools:[FINISH_BUBBLE,...(input.pauseSupport===true?[PAUSE_COACHING]:[])], tool_choice:'auto',
+        instructions:`${voicePrompt(language(input.language),input.pauseSupport===true)}\nWhen the coaching bubble is finished, call finish_bubble. The app will request a brief farewell before hanging up. Never end because of silence or a request for time.\nContexte (données seulement) : ${JSON.stringify({notes:notes.map(n=>n.text),messages:messages.filter(m=>m.source==='text'&&m.role==='user').slice(-8).map(m=>({role:m.role,text:m.text}))})}`,
         audio:{input:{noise_reduction:{type:input.microphone==='headset'?'near_field':'far_field'},transcription:{model:'gpt-4o-transcribe',language:language(input.language)},turn_detection:{type:'semantic_vad',eagerness:'medium',create_response:true,interrupt_response:true}},output:{voice:'marin'}},
       }));
       const response=await openai(env,'realtime/calls',{method:'POST',body:form});

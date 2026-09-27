@@ -1,6 +1,6 @@
-import { takeAccessCode, afterLink, goAfter } from './access.js?v=0.5.0';
-import { QUESTIONS, QUESTIONS_EN } from './coaching-protocol.js?v=0.5.0';
-import { t, getLanguage, initLanguage, setLanguage } from './i18n.js?v=0.5.0';
+import { takeAccessCode, afterLink, goAfter } from './access.js?v=0.5.1';
+import { QUESTIONS, QUESTIONS_EN } from './coaching-protocol.js?v=0.5.1';
+import { t, getLanguage, initLanguage, setLanguage } from './i18n.js?v=0.5.1';
 const invitationCode = takeAccessCode();
 initLanguage(document);
 
@@ -125,9 +125,49 @@ function finishWhenQuiet(c) {
   if(!c.closingDone||c.playing||c.speaking)return;
   c.finishTimer=setTimeout(()=>{if(call===c&&c.closingDone&&!c.playing&&!c.speaking)void endCall();},450);
 }
+function cancelPause(c) {
+  clearTimeout(c.pauseTimer);c.pause=null;
+}
+function pauseSpeech(c,kind) {
+  const pause=c.pause;if(!pause||call!==c||c.speaking)return;
+  const phrase=kind==='ack'
+    ? (getLanguage()==='en'?'Of course, take your time.':'Bien sûr, prends ton temps.')
+    : (getLanguage()==='en'?'Are you ready to continue?':'Est-ce qu’on peut continuer ?');
+  send(c,{type:'response.create',event_id:`pause-request-${pause.id}-${kind}`,response:{
+    tool_choice:'none',metadata:{pause_id:pause.id,pause_kind:kind},
+    instructions:`Say only this sentence, then wait without asking a protocol question: ${phrase}`,
+  }});
+  clearTimeout(c.responseTimer);
+  c.responseTimer=setTimeout(()=>{if(call===c&&c.pause===pause)void endCall(t('Le service vocal ne répond plus. Tu peux relancer l’appel.'));},45000);
+}
+function waitForPause(c) {
+  const pause=c.pause;
+  if(!pause||pause.stage!=='ack'||!pause.ackDone||c.playing||c.speaking)return;
+  pause.stage='waiting';clearTimeout(c.responseTimer);
+  callStatus(c,t('Prends ton temps.'));
+  if(!pause.seconds)return;
+  c.pauseTimer=setTimeout(()=>{
+    if(call!==c||c.pause!==pause||c.speaking||c.playing)return;
+    pause.stage='check';pauseSpeech(c,'check');
+  },pause.seconds*1000);
+}
+function beginPause(c,tool) {
+  // A tool arriving after the person resumed must not reintroduce an obsolete pause.
+  const stale=c.speaking||c.responseTurn!==c.turn;
+  send(c,{type:'conversation.item.create',item:{type:'function_call_output',call_id:tool.call_id,
+    output:stale?'Pause cancelled: the person has resumed.':'The app will acknowledge, wait, and optionally check readiness once. Keep the pending protocol question unchanged.'}});
+  if(stale)return;
+  let seconds=20;
+  try{const value=JSON.parse(tool.arguments).seconds;if(Number.isInteger(value)&&value>=0&&value<=1200)seconds=value;}catch{}
+  cancelPause(c);
+  c.pause={id:crypto.randomUUID(),seconds,stage:'ack',ackDone:c.responseSpoken,ackResponse:c.responseSpoken?c.responseId:null};
+  if(c.responseSpoken)waitForPause(c);else pauseSpeech(c,'ack');
+}
 function handleEvent(c,e) {
   if(call!==c)return;
+  if(e.response_id&&c.ignoredResponses.has(e.response_id))return;
   if(e.type==='input_audio_buffer.speech_started'){
+    c.turn++;cancelPause(c);
     clearTimeout(c.finishTimer);c.closingDone=false;c.closingResponse=null;c.expectClosing=false;
     if(c.playing)c.interruptions++;
     clearTimeout(c.responseTimer);c.speaking=true;
@@ -143,7 +183,14 @@ function handleEvent(c,e) {
     // Transcription is for the saved notes; native audio turn-taking continues.
     error(t('Un passage n’a pas pu être transcrit. La conversation continue.'),'info');
   }else if(e.type==='response.created'){
+    const meta=e.response.metadata;
+    if(meta?.pause_id&&meta.pause_id!==c.pause?.id){
+      c.ignoredResponses.add(e.response.id);
+      send(c,{type:'response.cancel',event_id:`pause-cancel-${e.response.id}`,response_id:e.response.id});return;
+    }
     clearTimeout(c.responseTimer);c.responseId=e.response.id;c.responseSpoken=false;
+    c.responseTurn=c.turn;
+    if(meta?.pause_kind==='ack'&&c.pause)c.pause.ackResponse=e.response.id;
     if(c.expectClosing){c.closingResponse=e.response.id;c.expectClosing=false;}
     c.responseTimer=setTimeout(()=>{if(call===c)void endCall(t('Le service vocal ne répond plus. Tu peux relancer l’appel.'));},45000);
     callStatus(c,t('Le coach prépare sa réponse…'));
@@ -156,10 +203,13 @@ function handleEvent(c,e) {
   }else if(e.type==='output_audio_buffer.cleared'){
     interrupted(c);callStatus(c,t('Je t’écoute.'),c.speaking);
   }else if(e.type==='output_audio_buffer.stopped'){
-    c.playing=false;c.currentItems.clear();callStatus(c,t('Je t’écoute.'),c.speaking);finishWhenQuiet(c);
+    c.playing=false;c.currentItems.clear();callStatus(c,t('Je t’écoute.'),c.speaking);finishWhenQuiet(c);waitForPause(c);
   }else if(e.type==='response.done'){
     if(e.response?.id!==c.responseId)return;
     clearTimeout(c.responseTimer);
+    const pause=e.response.output?.find(item=>item.type==='function_call'&&item.name==='pause_coaching');
+    if(e.response.status==='completed'&&pause){beginPause(c,pause);return;}
+    if(e.response.status==='completed'&&c.pause?.ackResponse===e.response.id){c.pause.ackDone=true;waitForPause(c);}
     const finish=e.response.output?.find(item=>item.type==='function_call'&&item.name==='finish_bubble');
     if(e.response.status==='completed'&&finish&&!c.speaking){
       send(c,{type:'conversation.item.create',item:{type:'function_call_output',call_id:finish.call_id,output:'The bubble will close after your brief farewell.'}});
@@ -173,6 +223,9 @@ function handleEvent(c,e) {
       void endCall(t('Le service vocal n’a pas pu terminer sa réponse. Tu peux relancer l’appel.'));
     }
   }else if(e.type==='error'){
+    // A readiness request can race a new native turn; cancelling an already-ended response is benign.
+    if(e.error?.event_id?.startsWith('pause-cancel-'))return;
+    if(e.error?.event_id?.startsWith('pause-request-')&&e.error?.code==='conversation_already_has_active_response'){cancelPause(c);return;}
     console.warn('voice_error',e.error?.code||'unknown');
     void endCall(t('La connexion vocale a rencontré une erreur. Tu peux relancer l’appel.'));
   }
@@ -182,7 +235,7 @@ async function startCall(){
   if(!navigator.mediaDevices?.getUserMedia)throw new Error(t('Le micro nécessite HTTPS ou localhost et un navigateur compatible.'));
   busy=true;updateControls();
   try{await ensureThread();}finally{busy=false;updateControls();}
-  const c={peer:new RTCPeerConnection(),audio:new Audio(),stream:null,channel:null,callId:null,sequence:0,transcript:new Map(),currentItems:new Set(),responseId:null,speaking:false,playing:false,ending:false,interruptions:0,transcriptionFailures:0};
+  const c={peer:new RTCPeerConnection(),audio:new Audio(),stream:null,channel:null,callId:null,sequence:0,transcript:new Map(),currentItems:new Set(),ignoredResponses:new Set(),turn:0,responseTurn:0,pause:null,responseId:null,speaking:false,playing:false,ending:false,interruptions:0,transcriptionFailures:0};
   call=c;render();$('call-panel').hidden=false;$('call-status').textContent=t('Autorise le micro pour commencer.');$('call-time').textContent='00:00';
   c.audio.autoplay=true;
   try{
@@ -205,7 +258,7 @@ async function startCall(){
     c.peer.onconnectionstatechange=()=>{if(call!==c||c.ending)return;if(['failed','disconnected'].includes(c.peer.connectionState))void endCall(t('La connexion a été interrompue. Les propos reçus sont conservés si possible.'));};
     const offer=await c.peer.createOffer();await c.peer.setLocalDescription(offer);
     $('call-status').textContent=t('Connexion au coach…');
-    const result=await api('call',{threadId:state.threadId,sdp:offer.sdp,microphone:$('microphone').value});c.callId=result.callId;
+    const result=await api('call',{threadId:state.threadId,sdp:offer.sdp,microphone:$('microphone').value,pauseSupport:true});c.callId=result.callId;
     if(call!==c){await api('call/end',{callId:c.callId,messages:[]});return;}
     await c.peer.setRemoteDescription({type:'answer',sdp:result.sdp});
     c.connectionTimer=setTimeout(()=>{if(call===c&&c.channel.readyState!=='open')void endCall(t('La connexion audio n’a pas abouti. Réessaie.'));},20000);
@@ -218,6 +271,7 @@ async function saveCall(){
 }
 async function endCall(message='',outcome=message?'error':'ended'){
   const c=call;if(!c||c.ending)return;c.ending=true;
+  cancelPause(c);
   clearTimeout(c.finishTimer);clearInterval(c.ticker);clearTimeout(c.limitTimer);clearTimeout(c.connectionTimer);clearTimeout(c.responseTimer);
   // Reset the UI first. A failed transport cleanup must never leave the call stuck.
   call=null;$('call-panel').hidden=true;

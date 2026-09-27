@@ -197,3 +197,96 @@ test('a farewell already spoken with the finish tool is not repeated; back navig
     assert(!s.document.body.classList.contains('leaving-bubble'));
   }finally{s.close();}
 });
+
+function pauseRequest(s,seconds=20,{spoken=false}={}){
+  s.emit({type:'input_audio_buffer.speech_started',item_id:'pause-user'});
+  s.emit({type:'input_audio_buffer.speech_stopped',item_id:'pause-user'});
+  s.emit({type:'response.created',response:{id:'pause-tool-response'}});
+  if(spoken){
+    s.emit({type:'output_audio_buffer.started',response_id:'pause-tool-response'});
+    s.emit({type:'response.output_audio_transcript.done',response_id:'pause-tool-response',item_id:'pause-ack-item',transcript:'Bien sûr, prends ton temps.'});
+  }
+  s.emit({type:'response.done',response:{id:'pause-tool-response',status:'completed',output:[{type:'function_call',name:'pause_coaching',call_id:'pause-tool',arguments:JSON.stringify({seconds})}]}});
+  return s.requests().at(-1);
+}
+function pauseReply(s,request,id='pause-ack-response',{drain=true}={}){
+  s.emit({type:'response.created',response:{id,metadata:request.response.metadata}});
+  s.emit({type:'output_audio_buffer.started',response_id:id});
+  s.emit({type:'response.output_audio_transcript.done',response_id:id,item_id:id+'-item',transcript:request.response.instructions});
+  s.emit({type:'response.done',response:{id,status:'completed'}});
+  if(drain)s.emit({type:'output_audio_buffer.stopped',response_id:id});
+}
+test('requested pause starts after acknowledgement playback and checks readiness only once',async()=>{
+  const s=await setup();try{
+    s.question(0);assert.equal(s.http.find(r=>r.path==='/api/call').data.pauseSupport,true);
+    const ack=pauseRequest(s);assert.match(ack.response.instructions,/Bien sûr, prends ton temps/);
+    pauseReply(s,ack,'ack',{drain:false});s.tick(25000);await s.settle();
+    assert.equal(s.requests().length,2); // Still playing the acknowledgement, not yet counting the pause.
+    s.emit({type:'output_audio_buffer.stopped',response_id:'ack'});
+    s.tick(19999);assert.equal(s.requests().length,2);
+    s.tick(1);assert.equal(s.requests().length,3);
+    const check=s.requests().at(-1);assert.match(check.response.instructions,/Est-ce qu’on peut continuer/);
+    assert.equal(check.response.tool_choice,'none');pauseReply(s,check,'check');
+    s.tick(120000);await s.settle();assert.equal(s.requests().length,3);
+    assert.equal(s.document.getElementById('call-panel').hidden,false);
+    s.emit({type:'input_audio_buffer.speech_started',item_id:'ready'});
+    s.emit({type:'input_audio_buffer.speech_stopped',item_id:'ready'});s.question(0);
+    assert.equal(s.requests().length,3); // The resumed response remains native.
+  }finally{s.close();}
+});
+test('speaking during a pause cancels its check-in without affecting native turns',async()=>{
+  const s=await setup();try{
+    s.question(0);pauseReply(s,pauseRequest(s));s.tick(10000);
+    s.emit({type:'input_audio_buffer.speech_started',item_id:'early-resume'});
+    s.emit({type:'input_audio_buffer.speech_stopped',item_id:'early-resume'});s.question(1);
+    s.tick(60000);await s.settle();assert.equal(s.requests().length,2);
+    assert.equal(s.document.getElementById('call-panel').hidden,false);
+    assert.equal(s.sent.filter(e=>e.type==='session.update').length,0);
+  }finally{s.close();}
+});
+test('explicit longer pauses and indefinite waits do not trigger a transport timeout',async()=>{
+  for(const seconds of [75,0]){
+    const s=await setup({language:'en'});try{
+      s.question(0);const ack=pauseRequest(s,seconds);assert.match(ack.response.instructions,/Of course, take your time/);
+      pauseReply(s,ack);s.tick(seconds?74999:120000);await s.settle();
+      assert.equal(s.requests().length,2);assert.equal(s.document.getElementById('call-panel').hidden,false);
+      if(seconds){s.tick(1);assert.match(s.requests().at(-1).response.instructions,/Are you ready to continue/);}
+    }finally{s.close();}
+  }
+});
+test('an acknowledgement spoken alongside a pause tool is not repeated',async()=>{
+  const s=await setup();try{
+    s.question(0);pauseRequest(s,20,{spoken:true});assert.equal(s.requests().length,1);
+    s.emit({type:'output_audio_buffer.stopped',response_id:'pause-tool-response'});s.tick(20000);
+    assert.equal(s.requests().length,2);assert.match(s.requests().at(-1).response.instructions,/continuer/);
+  }finally{s.close();}
+});
+test('late pause tools and late acknowledgement responses cannot pause a resumed user',async()=>{
+  const s=await setup();try{
+    s.question(0);s.emit({type:'response.created',response:{id:'late-tool'}});
+    s.emit({type:'input_audio_buffer.speech_started',item_id:'new-thought'});
+    s.emit({type:'input_audio_buffer.speech_stopped',item_id:'new-thought'});
+    s.emit({type:'response.done',response:{id:'late-tool',status:'completed',output:[{type:'function_call',name:'pause_coaching',call_id:'late-tool-call',arguments:'{"seconds":20}'}]}});
+    assert.equal(s.requests().length,1);
+    assert.match(s.sent.at(-1).item.output,/cancelled/);
+    const ack=pauseRequest(s);s.emit({type:'input_audio_buffer.speech_started',item_id:'interrupt-ack'});
+    s.emit({type:'response.created',response:{id:'late-ack',metadata:ack.response.metadata}});
+    const cancel=s.sent.at(-1);assert.equal(cancel.type,'response.cancel');assert.equal(cancel.response_id,'late-ack');
+    s.emit({type:'error',error:{event_id:cancel.event_id,code:'response_cancel_not_active'}});
+    s.emit({type:'response.done',response:{id:'late-ack',status:'cancelled'}});
+    s.emit({type:'input_audio_buffer.speech_stopped',item_id:'interrupt-ack'});s.question(1);
+    s.tick(60000);await s.settle();assert.equal(s.requests().length,2);
+    assert.equal(s.document.getElementById('call-panel').hidden,false);
+  }finally{s.close();}
+});
+test('hangup and the twenty-minute limit cancel even an indefinite pause',async()=>{
+  for(const limit of [false,true]){
+    const s=await setup();try{
+      s.question(0);pauseReply(s,pauseRequest(s,limit?0:20));
+      if(limit)s.tick(1200000);else s.document.getElementById('hangup-button').click();
+      await s.settle();s.tick(20000);await s.settle();
+      assert.equal(s.document.getElementById('call-panel').hidden,true);
+      assert.equal(s.requests().length,2);assert.equal(s.track.stopped,true);
+    }finally{s.close();}
+  }
+});

@@ -4,8 +4,8 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#f4f3ed"><meta name="description" content="Un espace pour parler, prendre le temps de réfléchir et retrouver le fil. Hodge Podge, projet de hackathon X-IA.">
   <title>La Bulle — Hodge Podge</title>
-  <link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css?v=0.5.0">
-  <script type="module" src="/app.js?v=0.5.0"></script>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css?v=0.5.1">
+  <script type="module" src="/app.js?v=0.5.1"></script>
 </head>
 <body>
   <a class="skip-link" href="#message">Aller à la conversation</a>
@@ -63,7 +63,7 @@
       <details class="privacy"><summary>Où restent mes échanges ?</summary><p>Tes échanges et notes restent disponibles dans ton espace La Bulle pendant 30 jours. Tu peux les effacer quand tu veux.</p><p>La Bulle utilise OpenAI pour le coaching et la voix. <a href="https://developers.openai.com/api/docs/guides/your-data" target="_blank" rel="noopener noreferrer">Politique OpenAI</a></p><button id="erase-button" class="text-button">Effacer mon espace</button></details>
     </aside>
   </main>
-  <footer class="footer"><span>Hodge Podge · X-IA Hackathon 2026</span><a href="/team.html">Espace équipe</a><span>Version 0.5.0</span></footer>
+  <footer class="footer"><span>Hodge Podge · X-IA Hackathon 2026</span><a href="/team.html">Espace équipe</a><span>Version 0.5.1</span></footer>
   <dialog id="access-dialog"><form id="access-form"><p class="dialog-kicker">Bienvenue</p><h2>Ouvrir ta bulle</h2><p>Entre le code d’accès de l’équipe.</p><label for="access-code">Code d’accès</label><input id="access-code" type="password" autocomplete="current-password" required maxlength="200"><p id="access-error" class="form-error" role="alert"></p><div class="dialog-actions"><button type="button" data-close="access-dialog" class="quiet">Annuler</button><button type="submit" class="primary" id="access-submit">Entrer</button></div><p class="small muted" id="config-hint"></p></form></dialog>
   <dialog id="note-dialog"><form id="note-form"><p class="dialog-kicker">À relire, avec tes mots</p><h2>Ce que tu veux garder</h2><p>Modifie librement cette note. Elle sera partagée avec le coach lors des prochaines séances.</p><label for="note-text">Ta note</label><textarea id="note-text" rows="6" maxlength="2500" required></textarea><p id="note-error" class="form-error" role="alert"></p><div class="dialog-actions"><button type="button" data-close="note-dialog" class="quiet">Ne pas garder</button><button type="submit" id="note-save" class="primary">Conserver</button></div></form></dialog>
   <dialog id="about-dialog"><h2>Un peu d’espace pour penser.</h2><p>La Bulle est un projet de Hodge Podge : Séb, Fano et Kenneth, pour le hackathon X-IA.</p><p>Un espace pour réfléchir à ta vie professionnelle, une question à la fois.</p><p>Pour l’appel, autorise ton micro. Un casque est conseillé.</p><button data-close="about-dialog" class="primary">C’est compris</button></dialog>

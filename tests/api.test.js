@@ -64,6 +64,7 @@ test('voice session uses native automatic turn-taking and closes only for its ow
   assert.equal(voiceConfig.audio.input.turn_detection.create_response,true);
   assert.equal(voiceConfig.audio.input.turn_detection.type,'semantic_vad');
   assert.equal(voiceConfig.audio.input.turn_detection.interrupt_response,true);
+  assert.equal(voiceConfig.tools.some(t=>t.name==='pause_coaching'),false); // Cached clients cannot execute this tool.
   assert.equal((await request('call',{data:{threadId:threadA,sdp:'v=0\r\n'}})).status,409);
   assert.equal((await request('call/end',{cookie:cookieB,data:{callId:result.data.callId,messages:[]}})).status,404);
   const ending={callId:result.data.callId,messages:[{role:'user',text:'Parole de test.'}]};
@@ -73,7 +74,8 @@ test('voice session uses native automatic turn-taking and closes only for its ow
 });
 test('English prompts, transcription language, noise reduction and unrestricted call count',async()=>{
   for(let i=0;i<14;i++){
-    const r=await request('call',{data:{threadId:threadA,sdp:'v=0\r\n',language:'en',microphone:'headset'}});assert.equal(r.status,200);
+    const r=await request('call',{data:{threadId:threadA,sdp:'v=0\r\n',language:'en',microphone:'headset',pauseSupport:true}});assert.equal(r.status,200);
+    assert.ok(voiceConfig.tools.some(t=>t.name==='pause_coaching'));
     assert.equal(r.data.maxSeconds,1200);assert.equal(voiceConfig.audio.input.transcription.language,'en');
     assert.equal(voiceConfig.audio.input.transcription.model,'gpt-4o-transcribe');
     assert.equal(voiceConfig.audio.input.noise_reduction.type,'near_field');assert.match(voiceConfig.instructions,/Welcome to this bubble/);assert.doesNotMatch(voiceConfig.instructions,/Parle français/);

@@ -92,7 +92,7 @@ async def main():
             asyncio.create_task(consume())
         call=None
         try:
-            await peer.setLocalDescription(await peer.createOffer());call=await post('call',{'threadId':thread['id'],'sdp':peer.localDescription.sdp,'language':LANGUAGE});await peer.setRemoteDescription(RTCSessionDescription(call['sdp'],'answer'))
+            await peer.setLocalDescription(await peer.createOffer());call=await post('call',{'threadId':thread['id'],'sdp':peer.localDescription.sdp,'language':LANGUAGE,'pauseSupport':True});await peer.setRemoteDescription(RTCSessionDescription(call['sdp'],'answer'))
             await asyncio.wait_for(done.wait(),150 if FINISH else 100);assert (len(spoken)>=4 if FINISH else len(spoken)==3),(len(spoken),failure);assert not failure,failure;assert len(requested)==(2 if FINISH else 1);assert not FINISH or finish_called;print('PASS: exact protocol, native turns'+(', finish tool and farewell.' if FINISH else '.'),flush=True)
         finally:
             for t in timers:t.cancel()

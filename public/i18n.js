@@ -1,4 +1,5 @@
 export const EN = {
+  'Prends ton temps.':'Take your time.',
   'Terminer ma bulle':'Finish my bubble',
   "Explorer La Bulle":"Explore La Bulle",
   "La bulle":"The bubble",

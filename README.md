@@ -43,8 +43,8 @@ vérifié par le serveur. Ce lien donne accès aux essais : le partager avec les
 1. Écrire une situation dans le champ de message et entrer le code d’accès.
 2. Envoyer le message, ou choisir **Appeler** et autoriser le microphone.
 3. Pendant l’appel, parle naturellement : le coach détecte quand tu as terminé et répond
-   directement. Les minuteries de silence ajoutées dans le navigateur ont été retirées. Il n’y a
-   aucun bouton de prise de parole ; seul **Raccrocher** reste affiché.
+   directement. Tu peux revenir à une question précédente ou demander une pause. Par défaut, le
+   coach attend 20 secondes avant de demander s’il peut continuer. Aucun bouton de prise de parole.
 4. À la fin du script ou après **Raccrocher**, l’après-bulle s’ouvre après la sauvegarde. Pour un
    échange écrit, le coach peut clore la bulle ; le bouton **Terminer ma bulle** permet aussi de finir.
 5. Modifier le récap, le copier ou se l’envoyer, puis donner son avis si on le souhaite.
@@ -157,8 +157,8 @@ exige une action de la personne.
 L’agent vocal reçoit le fil récent et les notes approuvées. Realtime gère directement les tours de
 parole et les interruptions avec `semantic_vad`. Les 14 questions du PDF sont dans les instructions
 du modèle, qui doit les suivre dans l’ordre et mot pour mot, sauf demande explicite de répétition,
-explication, temps, passage de question, arrêt ou envie de passer à l’action. Le logiciel ne prétend
-ni lire un agenda ni envoyer un rappel. L’agenda, Telegram et les autres fournisseurs restent hors
+explication, retour en arrière, temps, passage de question, arrêt ou envie de passer à l’action.
+Le logiciel ne prétend ni lire un agenda ni envoyer un rappel. L’agenda, Telegram et les autres fournisseurs restent hors
 de cette version.
 
 ## Coaching en français et anglais

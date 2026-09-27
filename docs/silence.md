@@ -1,25 +1,68 @@
-# Conversation vocale : version native
+# Conversation vocale et pauses demandées
 
 La personne parle et peut interrompre le coach. Le seul bouton est **Raccrocher**.
+Les 14 questions originales françaises et anglaises de Kedo restent inchangées.
 
-## Ce qui a changé
+## Conversation ordinaire
 
-Les délais fixes de cinq puis trois secondes et le contrôleur JavaScript associé ont été retirés. Le bug `Illegal invocation` provenait de fonctions natives de minuterie appelées avec un objet comme contexte (`this.clearTimer(...)`). Il pouvait interrompre la gestion d’un tour, puis faire échouer le nettoyage de l’appel lui-même.
+Realtime gère les tours de parole avec `semantic_vad`, `eagerness: medium`, `create_response: true`
+et `interrupt_response: true`. Les silences ordinaires ne déclenchent aucun chronomètre client.
+La conversation ne dépend pas de la transcription. Le navigateur demande l’accueil ; les réponses
+ordinaires suivantes viennent de la détection native de fin de parole.
 
-Realtime gère désormais directement les tours de parole : `semantic_vad`, `eagerness: medium`, `create_response: true`, `interrupt_response: true`. Le navigateur demande seulement l’accueil. Le modèle reprend après la réponse de l’utilisateur sans `response.create` envoyé par le client, sans transcription obligatoire et sans compteur de secondes client.
+## Revenir à une question
 
-Ce réglage ne garantit pas une pause précise de cinq secondes. La priorité de cette version est une conversation qui continue. La détection s’appuie sur la fin de l’énoncé ; son comportement doit être essayé avec Séb.
+Une demande de retour est prioritaire sur l’avancement du protocole. Le coach accepte brièvement et
+laisse la personne compléter sa réponse. Il répète la question uniquement si elle le demande ; il
+clarifie la question visée si nécessaire. Il reprend ensuite à la première question restée sans
+réponse, sans recommencer les étapes déjà répondues ni relancer l’accueil d’un nouvel appel.
 
-## Script
+## Demander du temps
 
-Les 14 questions originales, attribuées à Kedo Academy by Tirezio, sont dans `public/coaching-protocol.js` et les instructions serveur. Le modèle doit les suivre dans l’ordre, mot pour mot, avec des exceptions explicites pour expliquer, répéter, laisser du temps, passer une question ou arrêter, notamment pour passer à l’action sans débrief. Le client ne bloque plus la conversation sur une comparaison de transcription.
+Le modèle appelle `pause_coaching` uniquement sur demande explicite, sans avancer le protocole.
+L’application fait dire « Bien sûr, prends ton temps. » une seule fois puis attend la fin de cette
+phrase pour démarrer le délai. En anglais : « Of course, take your time. »
+
+- « Attends, je note », « une minute » ou « deux minutes » : 20 secondes par défaut.
+- Une durée en secondes, ou une durée expressément exacte : respecter cette durée.
+- « Je te dirai quand reprendre » ou « ne me relance pas » : aucune relance automatique.
+- Si la personne reprend la parole, annuler la relance prévue et laisser Realtime répondre.
+- Sinon, demander une seule fois « Est-ce qu’on peut continuer ? », puis attendre la réponse.
+- Un accord pour continuer ne compte pas comme réponse à la question Kedo encore en attente.
+- Une nouvelle demande de temps peut créer une nouvelle pause. Pas de relances répétitives.
+
+Le délai utilise une minuterie de l’application, pas une estimation du modèle. Les protections contre
+une connexion bloquée restent actives pendant une réponse, mais ne coupent pas une pause demandée.
+La limite globale de 20 minutes continue de s’appliquer. Le raccrochage annule toute relance.
+L’outil est proposé seulement aux clients qui déclarent `pauseSupport: true`, afin de préserver les
+onglets ouverts avec une ancienne version de l’application.
+
+Par écrit, le coach accepte aussi les retours et les pauses, puis attend le prochain message ; il
+n’envoie pas de relance chronométrée.
 
 ## Vérification
 
-Les tests d’interface contrôlent plusieurs réponses automatiques successives, une transcription manquante, le raccrochage quand la fermeture du transport échoue et la récupération après absence de réponse. Les minuteries de test rejettent un mauvais contexte d’appel, comme le navigateur.
+Les tests de `tests/voice-ui.test.js` exécutent le vrai contrôleur avec des événements WebRTC fictifs.
+Ils couvrent la fin de lecture de l’accusé de réception, les délais, la reprise anticipée, les outils
+arrivant en retard, l’absence de relances répétées et le raccrochage pendant une pause. Ils gardent
+les tests des réponses natives, interruptions, erreurs de transcription et sauvegarde.
 
-Le script `scripts/check-voice.py` n’envoie qu’une seule demande de réponse pour l’accueil ; toutes les suivantes doivent venir du transport natif. Il utilise deux réponses audio synthétiques et vérifie les trois premières questions. Il ne remplace pas un essai du code frontend dans un navigateur.
+`tests/api.test.js` vérifie les paramètres Realtime et la compatibilité des anciens clients.
 
-Pour ce dernier essai, un banc local charge le vrai `public/app.js` et les API WebRTC du navigateur. Seule la source du microphone est remplacée par un fichier sonore fictif. On vérifie la progression des questions, l’absence d’erreur JavaScript, puis le bouton Raccrocher et la transcription sauvegardée.
+Le test facultatif payant `scripts/check-coach-controls.py` utilise le modèle Realtime réel avec des
+messages fictifs pour vérifier les durées et le retour à une question en français et en anglais :
 
-[Documentation officielle : détection native de fin de parole](https://developers.openai.com/api/docs/guides/realtime-vad).
+```sh
+python scripts/check-coach-controls.py
+```
+
+Il nécessite Node.js sur PATH, Python avec `aiohttp` et `.dev.vars` configuré. Il ne prend pas le
+microphone et ne sauvegarde aucune conversation dans l’application. Ce test de compréhension ne
+remplace pas les tests du contrôleur ni un essai vocal humain.
+
+`scripts/check-voice.py` vérifie les trois premières questions avec deux réponses audio synthétiques.
+Avec `--finish`, il vérifie aussi la clôture. `scripts/browser-voice-test.mjs` permet un essai du vrai
+frontend avec un microphone synthétique dans le navigateur.
+
+[Détection native](https://developers.openai.com/api/docs/guides/realtime-vad) ·
+[Outils Realtime](https://developers.openai.com/api/docs/guides/realtime-mcp)
