@@ -60,7 +60,7 @@ async function route(r:Request,env:NotionEnv,ctx:ExecutionContext){
     const jobs=(await env.DB.prepare('SELECT id,intention,stage,status,error,created_at,published_url FROM notion_jobs WHERE account_id=? ORDER BY created_at DESC LIMIT 30').bind(who.id).all()).results;return reply({jobs});
   }
   if(path==='/jobs'&&method==='POST'){
-    const input=await limitedJSON(r,20000),id=pageId(input.id),intention=cleanText(input.intention,2500);
+    const input=await limitedJSON(r,40000),id=pageId(input.id),intention=cleanText(input.intention,8000);
     if(input.consent!==true||!Array.isArray(input.pages)||input.pages.length<1||input.pages.length>3)return reject(400,'consent_and_pages');
     const pages=[...new Set(input.pages.map(pageId))];
     const duplicate=await env.DB.prepare('SELECT id FROM notion_jobs WHERE id=? AND account_id=?').bind(id,who.id).first();if(duplicate)return reply({id},200);

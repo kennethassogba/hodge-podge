@@ -1,1 +1,42 @@
 .notion-main{max-width:1100px;margin:48px auto;padding:0 24px}.notion-main h1{font-size:clamp(1.8rem,4vw,2.8rem);max-width:800px;line-height:1.15}.notion-lead{max-width:700px;margin:20px 0 32px;color:var(--muted);line-height:1.7}.notion-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:28px;margin-bottom:24px}.notion-card h2{font-size:1.25rem;margin:0 0 20px}.notion-card p{line-height:1.6}.notion-card label:not(.checkbox-label),.notion-card legend{display:block;font-weight:600;margin:20px 0 10px}.notion-card textarea,.notion-card input:not([type=checkbox]),.notion-card select{width:100%;border:1px solid var(--line);border-radius:8px;padding:12px;background:var(--paper);color:var(--ink);font:inherit}.notion-card textarea{resize:vertical;line-height:1.6}.notion-card fieldset{border:0;padding:0;margin:20px 0}.notion-layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(230px,1fr);gap:24px}.notion-account{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.notion-search{display:flex;gap:8px}.notion-card .checkbox-label{display:flex;align-items:flex-start;gap:10px;line-height:1.5;margin:16px 0}.notion-card .checkbox-label input{margin-top:5px;flex:none}.notion-card .primary{margin-top:16px}.notion-card summary{cursor:pointer;font-weight:600}#notice{padding:16px;border-radius:8px;background:var(--soft);line-height:1.5;margin-bottom:24px}#notice[data-error=true]{background:var(--danger-soft);color:var(--danger)}#jobs button{display:block;text-align:left;width:100%;padding:12px;border-bottom:1px solid var(--line);line-height:1.5}#jobs small{display:block;color:var(--muted);margin-top:6px}#evidence blockquote{margin:20px 0;padding:12px 18px;border-left:3px solid var(--accent);background:var(--paper)}#evidence a{display:block;margin-top:8px}#checks{margin:20px 0}#published{display:block;margin:24px 0}#published[hidden]{display:none}#delete-job{display:block;margin-top:20px}.notion-return{margin:32px 0}.notion-main [hidden]{display:none!important}@media(max-width:760px){.notion-layout{grid-template-columns:1fr}.notion-main{margin-top:28px;padding:0 16px}.notion-card{padding:20px}.notion-account{align-items:flex-start;gap:12px}.notion-account p{overflow-wrap:anywhere}}
+.notion-main{max-width:920px}
+.notion-main>.dialog-kicker{color:var(--muted);margin-bottom:var(--s3)}
+.notion-main h1{font-size:clamp(32px,5vw,48px);letter-spacing:-1.6px;font-weight:500}
+.notion-lead{margin:var(--s4) 0 var(--s10)}
+.after-section-heading{display:flex;align-items:flex-start;gap:var(--s4);margin-bottom:var(--s6)}
+.section-number{font-size:11px;letter-spacing:1px;color:var(--muted);padding-top:5px;flex:none}
+.after-section-heading h2{margin:0 0 var(--s1);font-size:21px}
+.after-section-heading p{color:var(--muted);font-size:13px}
+.recap-card{padding:var(--s8)}
+#recap{background:var(--surface);border-color:var(--line);font-size:15px;line-height:1.85;min-height:240px;padding:var(--s5);white-space:pre-wrap}
+#recap:disabled{background:var(--paper)}
+#recap-status{margin-top:var(--s3);min-height:20px}
+.recap-actions{display:flex;flex-wrap:wrap;gap:var(--s3);margin-top:var(--s5)}
+.recap-actions button{display:inline-flex;align-items:center;justify-content:center;gap:var(--s2);margin:0!important;border:1px solid var(--line)}
+.recap-actions .primary{border-color:var(--accent)}
+.notion-card .transcript-choice{font-size:12px;color:var(--muted);margin:var(--s4) 0 0;align-items:center}
+.notion-card .transcript-choice input{margin:0;accent-color:var(--accent)}
+.email-row{display:flex;gap:var(--s3);align-items:center}
+.email-row input{min-width:0}.email-row .primary{margin:0}
+#email-status:empty{display:none}#email-status{margin-top:var(--s3)}
+.after-feedback{padding:var(--s8);background:var(--paper)}
+.after-feedback textarea{background:var(--surface)!important}
+.after-feedback label,.after-feedback legend{font-size:13px;font-weight:500!important}
+.after-feedback .nps-choice{padding:0}
+.after-feedback .nps-choice input{padding:0;border:0}
+.after-feedback .nps-field{margin-top:0}
+#after-feedback-thanks{padding:var(--s4) 0;color:var(--accent)}
+.integrations{border-block:1px solid var(--line);margin-top:var(--s8)}
+.integrations>summary{display:flex;align-items:flex-start;gap:var(--s4);list-style:none;cursor:pointer;padding:var(--s6) 0}
+.integrations>summary::-webkit-details-marker{display:none}
+.integrations strong{display:block;font-size:18px;font-weight:600;letter-spacing:-.5px}
+.integrations small{display:block;color:var(--muted);font-size:12px;margin-top:var(--s1)}
+.integration-plus{margin-left:auto;font-size:24px;font-weight:400;color:var(--accent)}
+.integrations[open] .integration-plus{transform:rotate(45deg)}
+.integration-content{padding-top:var(--s4)}
+#result-title{font-size:18px;white-space:pre-wrap;line-height:1.6}
+.after-loading{display:flex;align-items:center;gap:var(--s3);padding:var(--s8) 0;color:var(--muted)}
+.loading-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);animation:after-pulse 1.5s ease-in-out infinite}
+@keyframes after-pulse{50%{opacity:.3}}
+@media(max-width:560px){.recap-card,.after-feedback{padding:var(--s5)}#recap{padding:var(--s3);font-size:16px}.recap-actions{gap:var(--s2)}.recap-actions button{font-size:12px;flex:1;padding-inline:var(--s3)}.notion-card textarea,.notion-card input{font-size:16px}.after-section-heading{gap:var(--s3)}.email-row{flex-wrap:wrap}.email-row .primary{width:100%}}
+@media(prefers-reduced-motion:reduce){.loading-dot{animation:none}}

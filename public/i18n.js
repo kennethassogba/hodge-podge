@@ -1,4 +1,5 @@
 export const EN = {
+  'Terminer ma bulle':'Finish my bubble',
   "Explorer La Bulle":"Explore La Bulle",
   "La bulle":"The bubble",
   "L’après-bulle":"After the bubble",

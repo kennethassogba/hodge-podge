@@ -28,7 +28,7 @@ before(async()=>{
       const result=draft?{text:'Je souhaite réfléchir avant de répondre.'}:latest.includes('pas d’action')?{reply:'D’accord. Avec quoi repars-tu de cet échange ?',action:'cloturer'}:{reply:'Qu’aimerais-tu éclaircir en premier ?',action:'clarifier'};
       return Response.json({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify(result)}]}]});
     }}));
-  const db=await mf.getD1Database('DB');const sql=(await Promise.all(['0001_initial.sql','0002_feedback.sql','0004_nps.sql'].map(f=>readFile('migrations/'+f,'utf8')))).join('\n');
+  const db=await mf.getD1Database('DB');const sql=(await Promise.all(['0001_initial.sql','0002_feedback.sql','0004_nps.sql','0005_after_bubble.sql'].map(f=>readFile('migrations/'+f,'utf8')))).join('\n');
   for(const statement of sql.split(';').filter(x=>x.trim()))await db.prepare(statement).run();
 });
 after(async()=>{await mf?.dispose();});

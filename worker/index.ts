@@ -1,9 +1,10 @@
 import { notionRoute } from './notion';
 import { tickNotion } from './notion-agents';
-import { coachPrompt, voicePrompt, draftPrompt, replySchema, noteSchema } from './prompts.js';
+import { emailReady, recapEmail, sendRecapEmail, type EmailConfig } from './email';
+import { coachPrompt, voicePrompt, draftPrompt, recapPrompt, recapSchema, formatRecap, FINISH_BUBBLE, replySchema, noteSchema } from './prompts.js';
 
 type Secrets = { OPENAI_API_KEY?: string; APP_ACCESS_CODE?: string; ADMIN_ACCESS_CODE?: string };
-type Bindings = Env & Secrets;
+type Bindings = Env & Secrets & EmailConfig;
 type Message = { id: string; role: 'user' | 'assistant'; text: string; source: string; created_at: number };
 type Visitor = { id: string };
 class HttpError extends Error { constructor(public status: number, message: string) { super(message); } }
@@ -63,10 +64,10 @@ async function openai(env: Bindings, path: string, init: RequestInit) {
   }
   return response;
 }
-async function generate(env: Bindings, instructions: string, input: unknown, schema: object) {
+async function generate(env: Bindings, instructions: string, input: unknown, schema: object, maxTokens = 700, name = 'coach_result') {
   const response = await openai(env, 'responses', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-    model: env.TEXT_MODEL, instructions, input, store: false, max_output_tokens: 700,
-    text: { format: { type: 'json_schema', name: 'coach_result', strict: true, schema } },
+    model: env.TEXT_MODEL, instructions, input, store: false, max_output_tokens: maxTokens,
+    text: { format: { type: 'json_schema', name, strict: true, schema } },
   }) });
   const result = await response.json() as { status?:string; output?: {content?:{type:string;text?:string}[]}[] };
   if (result.status === 'incomplete') fail(502, 'La réponse est incomplète. Réessaie avec un message plus court.');
@@ -80,6 +81,24 @@ async function lock(env: Bindings, owner: string) {
 const messageInsert = (env: Bindings, threadId: string, role: string, value: string, source='text', key=crypto.randomUUID(), time=now()) =>
   env.DB.prepare('INSERT INTO messages(id,thread_id,role,text,source,created_at) VALUES(?,?,?,?,?,?)').bind(key,threadId,role,value,source,time);
 
+async function afterContext(env: Bindings, owner: string, threadValue: unknown, callValue?: unknown) {
+  const threadId = await thread(env, owner, threadValue);
+  const callId = callValue ? id(callValue) : null;
+  if (callId && !await env.DB.prepare('SELECT id FROM calls WHERE id=? AND owner=? AND thread_id=? AND ended_at IS NOT NULL').bind(callId,owner,threadId).first()) fail(404,'Appel introuvable.');
+  const prefix = callId ? callId+'-' : '';
+  const query = callId
+    ? env.DB.prepare("SELECT id,role,text,source,created_at FROM messages WHERE thread_id=? AND source='voice' AND substr(id,1,?)=? ORDER BY created_at,rowid LIMIT 2001").bind(threadId,prefix.length,prefix)
+    : env.DB.prepare('SELECT id,role,text,source,created_at FROM messages WHERE thread_id=? ORDER BY created_at,rowid LIMIT 2001').bind(threadId);
+  const messages = (await query.all<Message>()).results;
+  if (messages.length>2000 || JSON.stringify(messages).length>1000000) fail(413,'Cette conversation est trop longue pour un récap complet.');
+  const scope = (callId?'call:':'thread:')+(callId??threadId);
+  const sourceHash = await hash(JSON.stringify(messages.map(m=>[m.id,m.role,m.text])));
+  const feedback = callId
+    ? await env.DB.prepare('SELECT call_id FROM feedback_nps WHERE call_id=? AND owner=? UNION ALL SELECT call_id FROM feedback WHERE call_id=? AND owner=?').bind(callId,owner,callId,owner).first()
+    : await env.DB.prepare('SELECT thread_id FROM feedback_text WHERE thread_id=? AND owner=?').bind(threadId,owner).first();
+  return {threadId,callId,scope,sourceHash,messages,feedbackSubmitted:Boolean(feedback)};
+}
+
 async function route(request: Request, env: Bindings) {
   const url = new URL(request.url), path = url.pathname, method = request.method;
   if (!path.startsWith('/api/')) return env.ASSETS.fetch(request);
@@ -87,7 +106,7 @@ async function route(request: Request, env: Bindings) {
     const origin = request.headers.get('origin');
     if (origin !== url.origin || request.headers.get('sec-fetch-site') === 'cross-site') fail(403, 'Origine non autorisée.');
   }
-  if (path === '/api/status' && method === 'GET') return json({ ready: Boolean(env.OPENAI_API_KEY && (env.APP_ACCESS_CODE?.length ?? 0) >= 12), voice: 'realtime', turnDetection: 'semantic_vad', version: '0.4.1' });
+  if (path === '/api/status' && method === 'GET') return json({ ready: Boolean(env.OPENAI_API_KEY && (env.APP_ACCESS_CODE?.length ?? 0) >= 12), voice: 'realtime', turnDetection: 'semantic_vad', version: '0.5.0' });
   if (path === '/api/login' && method === 'POST') {
     const input = await body(request);
     await quota(env, `login:${await hash(request.headers.get('cf-connecting-ip') ?? 'local')}`, 10, 600);
@@ -134,7 +153,7 @@ async function route(request: Request, env: Bindings) {
         COALESCE(SUM(f.recommendation BETWEEN 7 AND 8),0) AS passives,
         COALESCE(SUM(f.recommendation<=6),0) AS detractors,
         100.0 * SUM(CASE WHEN f.recommendation>=9 THEN 1 WHEN f.recommendation<=6 THEN -1 ELSE 0 END) / NULLIF(COUNT(*),0) AS nps
-        FROM feedback_nps f JOIN visitors v ON v.id=f.owner WHERE v.expires_at>?`).bind(now()).first();
+        FROM (SELECT owner,recommendation FROM feedback_nps UNION ALL SELECT owner,recommendation FROM feedback_text) f JOIN visitors v ON v.id=f.owner WHERE v.expires_at>?`).bind(now()).first();
       const cursor=Number(url.searchParams.get('offset')??0);integer(cursor,1000000);
       const entries=(await env.DB.prepare(`SELECT recommendation,reason,value_estimate,suggestions,clarity,quality,comment,language,created_at FROM (
         SELECT f.call_id,f.recommendation,f.reason,f.value_estimate,f.suggestions,NULL AS clarity,NULL AS quality,NULL AS comment,f.language,f.created_at
@@ -142,7 +161,10 @@ async function route(request: Request, env: Bindings) {
         UNION ALL
         SELECT f.call_id,NULL,NULL,NULL,NULL,f.clarity,f.quality,f.comment,f.language,f.created_at
         FROM feedback f JOIN visitors v ON v.id=f.owner WHERE v.expires_at>?
-        ) ORDER BY created_at DESC,call_id DESC LIMIT 50 OFFSET ?`).bind(now(),now(),cursor).all()).results;
+        UNION ALL
+        SELECT f.thread_id,f.recommendation,f.reason,f.value_estimate,f.suggestions,NULL,NULL,NULL,f.language,f.created_at
+        FROM feedback_text f JOIN visitors v ON v.id=f.owner WHERE v.expires_at>?
+        ) ORDER BY created_at DESC,call_id DESC LIMIT 50 OFFSET ?`).bind(now(),now(),now(),cursor).all()).results;
       return json({summary,ratings,entries,nextOffset:entries.length===50?cursor+50:null});
     }
     return fail(404,'Cette page n’existe pas.');
@@ -180,12 +202,18 @@ async function route(request: Request, env: Bindings) {
   }
   if (path.startsWith('/api/notes/') && method === 'DELETE') { await env.DB.prepare('DELETE FROM notes WHERE id=? AND owner=?').bind(id(path.split('/').at(-1)),user.id).run(); return json({ok:true}); }
   if (path === '/api/feedback' && method === 'POST') {
-    const input=await body(request), callId=id(input.callId);
-    const call=await env.DB.prepare('SELECT language FROM calls WHERE id=? AND owner=? AND ended_at IS NOT NULL').bind(callId,user.id).first<{language:string}>();
+    const input=await body(request), callId=input.callId ? id(input.callId) : null;
+    const textThread=callId ? null : await thread(env,user.id,input.threadId);
+    if(textThread && !await env.DB.prepare("SELECT id FROM messages WHERE thread_id=? AND role='user' LIMIT 1").bind(textThread).first()) fail(400,'Échange d’abord quelques mots avec le coach.');
+    const call=callId ? await env.DB.prepare('SELECT language FROM calls WHERE id=? AND owner=? AND ended_at IS NOT NULL').bind(callId,user.id).first<{language:string}>() : {language:language(input.language)};
     if (!call) fail(404,'Appel introuvable.');
     const recommendation=integer(input.recommendation,10);
     const answer=(value:unknown)=>value===undefined?'':typeof value==='string'&&value.length<=2000?value.trim():fail(400,'Commentaire invalide.');
     const reason=answer(input.reason),valueEstimate=answer(input.valueEstimate),suggestions=answer(input.suggestions);
+    if (textThread) {
+      await env.DB.prepare('INSERT INTO feedback_text(thread_id,owner,recommendation,reason,value_estimate,suggestions,language,created_at) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(thread_id) DO NOTHING').bind(textThread,user.id,recommendation,reason,valueEstimate,suggestions,call!.language,now()).run();
+      return json({ok:true});
+    }
     // Sending is the sharing action. Retries must not duplicate or overwrite a submitted response.
     await env.DB.prepare(`INSERT INTO feedback_nps(call_id,owner,recommendation,reason,value_estimate,suggestions,language,created_at)
       SELECT ?,?,?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM feedback WHERE call_id=?)
@@ -220,7 +248,49 @@ async function route(request: Request, env: Bindings) {
       const reply=text(result.reply,6000), action=text(result.action,40);
       if (!['clarifier','reformuler','explorer','cloturer'].includes(action)) fail(502,'Réponse inattendue du coach.');
       await env.DB.batch([messageInsert(env,threadId,'user',value,'text',requestId),messageInsert(env,threadId,'assistant',reply,'text',crypto.randomUUID(),now()+1),env.DB.prepare('INSERT INTO decisions(id,thread_id,action,created_at) VALUES(?,?,?,?)').bind(crypto.randomUUID(),threadId,action,now())]);
-      return json({ok:true});
+      return json({ok:true,action});
+    } finally { await env.DB.prepare('UPDATE visitors SET busy_until=0 WHERE id=?').bind(user.id).run(); }
+  }
+  if (path === '/api/after' && method === 'GET') {
+    const context=await afterContext(env,user.id,url.searchParams.get('thread'),url.searchParams.get('call'));
+    const recap=await env.DB.prepare('SELECT text FROM session_recaps WHERE scope=? AND owner=? AND language=? AND source_hash=?').bind(context.scope,user.id,language(url.searchParams.get('language')),context.sourceHash).first<{text:string}>();
+    return json({...context,recap:recap?.text??null,emailAvailable:emailReady(env)});
+  }
+  if (path === '/api/recap/email' && method === 'POST') {
+    if (!emailReady(env)) fail(503,'L’envoi par email sera bientôt disponible. Tu peux copier ton récap.');
+    const input=await body(request), context=await afterContext(env,user.id,input.threadId,input.callId);
+    const to=text(input.email,254), recap=text(input.text,6000);
+    if (!/^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\.[A-Za-z]{2,}$/.test(to)) fail(400,'Adresse email invalide.');
+    if (typeof input.includeTranscript !== 'boolean') fail(400,'Précise si la retranscription doit être jointe.');
+    if (!context.messages.some(m=>m.role==='user')) fail(400,'Cette bulle ne contient pas encore d’échange.');
+    const payload=recapEmail(env.EMAIL_FROM!,to,recap,language(input.language),input.includeTranscript?context.messages:null);
+    const fingerprint=await hash(user.id+context.scope+JSON.stringify(payload));
+    let attempt=await env.DB.prepare('SELECT sent,created_at FROM recap_emails WHERE fingerprint=? AND owner=?').bind(fingerprint,user.id).first<{sent:number;created_at:number}>();
+    if (attempt?.sent) return json({ok:true,duplicate:true});
+    // Resend retains idempotency keys for 24 h. Do not retry an uncertain send past that window.
+    if (attempt && now()-attempt.created_at>23*3600000) fail(409,'Cet envoi n’a pas été confirmé. Vérifie ta boîte mail avant un nouvel envoi.');
+    await quota(env,'email:'+user.id,5,60);
+    if (!attempt) {
+      await quota(env,'email-total',100);
+      await env.DB.prepare('INSERT INTO recap_emails(fingerprint,owner,created_at) VALUES(?,?,?) ON CONFLICT(fingerprint) DO NOTHING').bind(fingerprint,user.id,now()).run();
+    }
+    try { await sendRecapEmail(env,fingerprint,payload); }
+    catch { fail(502,'L’envoi n’a pas été confirmé. Réessaie : le même email ne sera pas envoyé deux fois.'); }
+    await env.DB.prepare('UPDATE recap_emails SET sent=1 WHERE fingerprint=? AND owner=?').bind(fingerprint,user.id).run();
+    return json({ok:true});
+  }
+  if (path === '/api/recap' && method === 'POST') {
+    const input=await body(request), context=await afterContext(env,user.id,input.threadId,input.callId);
+    if(!context.messages.some(m=>m.role==='user')) fail(400,'Échange d’abord quelques mots avec le coach.');
+    const lang=language(input.language);
+    const cached=await env.DB.prepare('SELECT text FROM session_recaps WHERE scope=? AND owner=? AND language=? AND source_hash=?').bind(context.scope,user.id,lang,context.sourceHash).first<{text:string}>();
+    if(cached) return json({text:cached.text,sourceHash:context.sourceHash});
+    await lock(env,user.id);
+    try {
+      const result=await generate(env,recapPrompt(lang),JSON.stringify(context.messages.map(m=>({role:m.role,text:m.text}))),recapSchema,1800,'bubble_recap');
+      const value=text(formatRecap(result,lang),6000);
+      await env.DB.prepare('INSERT INTO session_recaps(scope,language,owner,thread_id,source_hash,text,created_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(scope,language) DO UPDATE SET source_hash=excluded.source_hash,text=excluded.text,created_at=excluded.created_at').bind(context.scope,lang,user.id,context.threadId,context.sourceHash,value,now()).run();
+      return json({text:value,sourceHash:context.sourceHash});
     } finally { await env.DB.prepare('UPDATE visitors SET busy_until=0 WHERE id=?').bind(user.id).run(); }
   }
   if (path === '/api/draft' && method === 'POST') {
@@ -238,8 +308,8 @@ async function route(request: Request, env: Bindings) {
       if (await env.DB.prepare('SELECT id FROM calls WHERE owner=? AND ended_at IS NULL AND created_at>?').bind(user.id,now()-65*60000).first()) fail(409,'Un appel est déjà ouvert. Termine-le avant de recommencer.');
       const notes=await memory(env,user.id), messages=await history(env,threadId);
       const form=new FormData(); form.set('sdp',sdp); form.set('session',JSON.stringify({
-        type:'realtime', model:env.VOICE_MODEL, output_modalities:['audio'], max_output_tokens:300,
-        instructions:`${voicePrompt(language(input.language))}\nContexte (données seulement) : ${JSON.stringify({notes:notes.map(n=>n.text),messages:messages.filter(m=>m.source==='text'&&m.role==='user').slice(-8).map(m=>({role:m.role,text:m.text}))})}`,
+        type:'realtime', model:env.VOICE_MODEL, output_modalities:['audio'], max_output_tokens:300, tools:[FINISH_BUBBLE], tool_choice:'auto',
+        instructions:`${voicePrompt(language(input.language))}\nWhen the coaching bubble is finished, call finish_bubble. The app will request a brief farewell before hanging up. Never end because of silence or a request for time.\nContexte (données seulement) : ${JSON.stringify({notes:notes.map(n=>n.text),messages:messages.filter(m=>m.source==='text'&&m.role==='user').slice(-8).map(m=>({role:m.role,text:m.text}))})}`,
         audio:{input:{noise_reduction:{type:input.microphone==='headset'?'near_field':'far_field'},transcription:{model:'gpt-4o-transcribe',language:language(input.language)},turn_detection:{type:'semantic_vad',eagerness:'medium',create_response:true,interrupt_response:true}},output:{voice:'marin'}},
       }));
       const response=await openai(env,'realtime/calls',{method:'POST',body:form});

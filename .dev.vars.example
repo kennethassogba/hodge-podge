@@ -5,3 +5,7 @@ APP_ACCESS_CODE=
 
 # Code distinct, réservé à Kenneth, Séb et Fano (20 caractères minimum).
 ADMIN_ACCESS_CODE=
+
+# Facultatif : email transactionnel, domaine vérifié dans Resend.
+RESEND_API_KEY=
+EMAIL_FROM=

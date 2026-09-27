@@ -23,7 +23,7 @@ OAuth sert aussi de connexion personnelle : aucune autre connexion obligatoire. 
 
 Le départ OAuth est un POST same-origin. `state` est aléatoire, à usage unique, valable dix minutes et associé à un cookie de navigateur HttpOnly/SameSite=Lax. Le cookie de session Notion est distinct, HttpOnly/SameSite=Strict. Les secrets restent chiffrés dans D1 avec une clé Cloudflare et une authentification AES-GCM liée au compte. Les refresh tokens sont renouvelés avec un verrou ; les paramètres d’URL sont masqués dans les logs Cloudflare.
 
-La personne écrit une intention ou choisit explicitement une note approuvée, sélectionne 1–3 pages, puis lance leur analyse avec « Examiner ces documents », sans case de confirmation supplémentaire. Aucune transcription n’est jointe. Les pages ne sont pas explorées au moment de l’appel vocal. La recherche Notion liste les pages autorisées, avec recherche par titre et pagination.
+Le récap modifiable de l’après-bulle est utilisé comme intention ; la personne peut le compléter. Sans récap, elle écrit une intention ou choisit une note approuvée. Elle sélectionne 1–3 pages, puis lance leur analyse avec « Examiner ces documents », sans case de confirmation supplémentaire. Aucune transcription n’est jointe. Les pages ne sont pas explorées au moment de l’appel vocal. La recherche Notion liste les pages autorisées, avec recherche par titre et pagination.
 
 ## Agents et exécution
 

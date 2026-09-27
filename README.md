@@ -13,14 +13,17 @@ reprendre le fil à la prochaine séance.
 
 ### L’après-bulle : passer à l’action
 
-Un prolongement facultatif dans Notion. À partir d’une intention et de quelques pages choisies,
-trois agents examinent les documents, vérifient les conclusions et préparent une proposition
-concrète : une trame de réunion, une règle de décision ou une clarification des responsabilités. La
-personne relit, modifie et choisit de publier une nouvelle page dans Notion.
+À la fin de la bulle, un récap modifiable rassemble les décisions, les pistes envisagées et les
+points à préciser. Il peut être copié vers n’importe quel assistant ou envoyé par email, avec ou
+sans la retranscription complète. Le questionnaire de retour est juste en dessous.
 
-Le bouton **L’après-bulle** est accessible dès l’accueil. La connexion Notion intervient uniquement
-dans ce second parcours et permet de retrouver les propositions sur plusieurs appareils. Aucune
-transcription du coaching n’est jointe automatiquement.
+Pour aller plus loin, la personne peut connecter Notion. Le récap devient son intention ; elle peut
+ajouter une précision et choisir quelques pages. Trois agents examinent les documents, vérifient
+les conclusions et préparent une proposition concrète. La personne la relit, la modifie et choisit
+de publier une nouvelle page dans Notion.
+
+Le bouton **L’après-bulle** est accessible dès l’accueil. Aucune connexion Notion n’est nécessaire
+pour le coaching ou le récap. La transcription n’est jamais jointe à l’analyse Notion.
 
 ## Essayer
 
@@ -32,20 +35,28 @@ L’application utilise réellement OpenAI : aucun mode découverte ni réponse 
 d’accès de l’équipe est la valeur `APP_ACCESS_CODE` du fichier local `.dev.vars` ; il se partage
 séparément du dépôt. Chaque navigateur reçoit son espace personnel.
 
+Un lien d’invitation peut ouvrir directement cet espace :
+`https://bulle.hodge-podge.workers.dev/#access=CODE_ENCODE`. Remplacer `CODE_ENCODE` par la valeur
+encodée de `APP_ACCESS_CODE`. Le fragment est retiré immédiatement de l’URL puis le code est
+vérifié par le serveur. Ce lien donne accès aux essais : le partager avec les personnes invitées.
+
 1. Écrire une situation dans le champ de message et entrer le code d’accès.
 2. Envoyer le message, ou choisir **Appeler** et autoriser le microphone.
 3. Pendant l’appel, parle naturellement : le coach détecte quand tu as terminé et répond
    directement. Les minuteries de silence ajoutées dans le navigateur ont été retirées. Il n’y a
    aucun bouton de prise de parole ; seul **Raccrocher** reste affiché.
-4. Raccrocher, choisir **Garder quelques notes**, corriger la proposition puis **Conserver**.
-5. Ouvrir une **Nouvelle séance** : les notes conservées accompagnent le nouvel échange.
+4. À la fin du script ou après **Raccrocher**, l’après-bulle s’ouvre après la sauvegarde. Pour un
+   échange écrit, le coach peut clore la bulle ; le bouton **Terminer ma bulle** permet aussi de finir.
+5. Modifier le récap, le copier ou se l’envoyer, puis donner son avis si on le souhaite.
+6. Revenir au coach pour une **Nouvelle séance**. Les notes enregistrées avec **Garder quelques
+   notes** restent la mémoire approuvée du coach ; le récap ne les remplace pas automatiquement.
 
 Un casque est conseillé. L’appel s’arrête après vingt minutes dans l’interface. Le navigateur doit
 rester ouvert.
 
-Pour essayer le second parcours, ouvrir **L’après-bulle**, connecter Notion, écrire une intention et
-sélectionner 1 à 3 pages. Cliquer sur **Examiner ces documents**, puis relire la proposition avant
-de la publier.
+Pour essayer les agents Notion, ouvrir **Continuer dans Notion** dans l’après-bulle, connecter son
+espace, compléter le récap si nécessaire et sélectionner 1 à 3 pages. Cliquer sur **Examiner ces
+documents**, puis relire la proposition avant de la publier.
 
 ## Développement local
 
@@ -66,10 +77,14 @@ Ouvrir http://127.0.0.1:8787. Les modèles configurés dans `wrangler.jsonc` son
 le texte et les notes, `gpt-realtime-2.1` pour la voix et `gpt-4o-transcribe` pour la transcription.
 L’accès à ces modèles a été vérifié avec le compte de l’équipe.
 
-Pour activer l’après-bulle, configurer les identifiants OAuth Notion selon [le guide
+Pour activer l’intégration Notion, configurer les identifiants OAuth Notion selon [le guide
 Notion](docs/notion.md). Sans cette configuration, le coach fonctionne normalement. La migration
 `0003_notion.sql`, incluse dans les commandes de migration ci-dessus, ajoute les tables nécessaires.
-Le guide détaille aussi les agents, les limites de lecture et les essais à réaliser.
+Le guide détaille aussi les agents, les limites de lecture et les essais à réaliser. La migration
+`0005_after_bubble.sql` ajoute les récaps, les retours des bulles écrites et le suivi des envois.
+
+L’email utilise Resend avec un domaine vérifié : voir [le guide de l’après-bulle](docs/apres-bulle.md).
+Sans configuration email, le récap, la copie, le questionnaire et Notion restent disponibles.
 
 ```sh
 npm run check
@@ -79,8 +94,9 @@ npm run build
 
 Les tests utilisent une vraie base D1 locale et un fournisseur OpenAI simulé, sans consommer de
 crédits. Ils couvrent l’isolation des espaces, les permissions, les décisions du coach,
-l’approbation de la mémoire et les reprises de conversation et le raccrochage. `build` vérifie le
-déploiement sans publier.
+l’approbation de la mémoire, les reprises et le raccrochage. Ils vérifient aussi les invitations,
+les récaps complets, les modifications avant OAuth, les pièces jointes et les doublons d’email.
+`build` vérifie le déploiement sans publier.
 
 Un test audio réseau optionnel rejoue trois questions avec deux réponses synthétiques, sans activer
 le microphone. Il consomme un peu de crédit OpenAI et utilise `.dev.vars`. Dans un environnement
@@ -89,6 +105,8 @@ Python disposant de `aiohttp` et `aiortc`, et avec Node.js sur le PATH :
 ```sh
 python scripts/check-voice.py http://127.0.0.1:8787
 python scripts/check-voice.py http://127.0.0.1:8787 en
+# Vérifier aussi la demande de fin de séance et son au revoir :
+python scripts/check-voice.py http://127.0.0.1:8787 fr --finish
 # Ou passer l’URL du déploiement à vérifier.
 ```
 

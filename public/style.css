@@ -68,3 +68,10 @@ select{font:inherit;color:var(--ink);background:var(--surface);border:1px solid 
 @media(max-width:360px){.nps-scale{grid-template-columns:repeat(4,minmax(0,1fr))}}
 
 @media(max-width:400px){.masthead .brand{font-size:17px;gap:var(--s2);white-space:nowrap}.masthead .brand-symbol{width:32px;height:32px;flex-shrink:0}.masthead .byline{display:none}.masthead #about-button{padding-inline:var(--s2)}}
+@view-transition{navigation:auto}
+::view-transition-old(root){animation:180ms ease-out both bubble-out}
+::view-transition-new(root){animation:260ms ease-out both bubble-in}
+@keyframes bubble-out{to{opacity:0;transform:translateY(-6px)}}
+@keyframes bubble-in{from{opacity:0;transform:translateY(8px)}}
+.leaving-bubble main{opacity:0;transform:translateY(-6px);transition:opacity 200ms ease,transform 200ms ease;pointer-events:none}
+@media(prefers-reduced-motion:reduce){::view-transition-old(root),::view-transition-new(root){animation:none}.leaving-bubble main{transition:none;transform:none}}

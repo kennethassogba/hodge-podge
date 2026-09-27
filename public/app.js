@@ -1,5 +1,7 @@
-import { QUESTIONS, QUESTIONS_EN } from './coaching-protocol.js?v=0.4.1';
-import { t, getLanguage, initLanguage, setLanguage } from './i18n.js?v=0.4.1';
+import { takeAccessCode, afterLink, goAfter } from './access.js?v=0.5.0';
+import { QUESTIONS, QUESTIONS_EN } from './coaching-protocol.js?v=0.5.0';
+import { t, getLanguage, initLanguage, setLanguage } from './i18n.js?v=0.5.0';
+const invitationCode = takeAccessCode();
 initLanguage(document);
 
 const $ = id => document.getElementById(id);
@@ -25,8 +27,13 @@ function updateControls() {
   $('erase-button').disabled=busy||Boolean(call)||Boolean(pendingSave);
   $('message').disabled = Boolean(call);
   $('draft-button').disabled = busy || Boolean(call) || Boolean(pendingSave) || !state.messages.some(m=>m.role==='user');
+  $('finish-bubble').hidden=!state.messages.some(m=>m.role==='user');
+  $('finish-bubble').disabled=busy||Boolean(call)||Boolean(pendingSave);
+  $('notion-next').href=afterLink(state.threadId,lastCallId());
+  $('notion-next').setAttribute('aria-disabled',String(busy||Boolean(pendingSave)));
   $('typing').hidden=!busy;
 }
+function lastCallId(){const last=state.messages.at(-1);return last?.source==='voice'?state.calls?.find(c=>last.id?.startsWith(c.id+'-'))?.id:null;}
 function render() {
   $('welcome').hidden = state.messages.length > 0 || Boolean(call);
   $('messages').replaceChildren(...state.messages.map(m=>{
@@ -76,11 +83,13 @@ $('access-form').addEventListener('submit',async event=>{
 $('composer').addEventListener('submit',event=>{event.preventDefault();void guard(async()=>{
   const value=$('message').value.trim();if(!value||busy||call||!access())return;
   busy=true;updateControls();const requestId=crypto.randomUUID();
-  try{await ensureThread();await api('chat',{threadId:state.threadId,text:value,id:requestId});$('message').value='';await load();scrollFeed();}
+  try{await ensureThread();const result=await api('chat',{threadId:state.threadId,text:value,id:requestId});$('message').value='';await load();scrollFeed();if(result.action==='cloturer'){busy=false;goAfter(state.threadId);}}
   finally{busy=false;updateControls();$('message').focus();}
 });});
 $('message').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();$('composer').requestSubmit();}});
 $('new-thread').onclick=()=>guard(async()=>{if(!access()||call||busy||pendingSave)return;const result=await api('threads',{});await load(result.id);});
+$('finish-bubble').onclick=()=>{if(!busy&&!call&&!pendingSave)goAfter(state.threadId,lastCallId());};
+$('notion-next').onclick=event=>{if(call||busy||pendingSave){event.preventDefault();if(call&&!busy)void endCall();}};
 $('add-note').onclick=()=>{if(access())openNote();};
 $('draft-button').onclick=()=>guard(async()=>{
   if(!access()||busy||call||pendingSave)return;busy=true;updateControls();
@@ -95,7 +104,7 @@ $('note-form').addEventListener('submit',async event=>{
 $('erase-button').onclick=()=>guard(async()=>{
   if(call){error(t('Termine l’appel avant d’effacer ton espace.'));return;}
   if(await confirm(t('Effacer tout mon espace ?'),t('Tes échanges, notes, retours et données d’appels seront supprimés de notre base active. Les journaux OpenAI et sauvegardes Cloudflare suivent leurs propres délais de conservation.'))){
-    await api('data',undefined,'DELETE');authenticated=false;state={threads:[],messages:[],notes:[],decisions:[],threadId:null};render();
+    await api('data',undefined,'DELETE');try{for(const key of Object.keys(window.sessionStorage))if(key.startsWith('hp_after'))window.sessionStorage.removeItem(key);}catch{}authenticated=false;state={threads:[],messages:[],notes:[],decisions:[],threadId:null};render();
   }
 });
 
@@ -111,9 +120,15 @@ function interrupted(c){
   c.currentItems.clear();c.playing=false;
 }
 function transcript(c,key,role) {if(!c.transcript.has(key))c.transcript.set(key,{role,text:'',order:c.sequence++});return c.transcript.get(key);}
+function finishWhenQuiet(c) {
+  clearTimeout(c.finishTimer);
+  if(!c.closingDone||c.playing||c.speaking)return;
+  c.finishTimer=setTimeout(()=>{if(call===c&&c.closingDone&&!c.playing&&!c.speaking)void endCall();},450);
+}
 function handleEvent(c,e) {
   if(call!==c)return;
   if(e.type==='input_audio_buffer.speech_started'){
+    clearTimeout(c.finishTimer);c.closingDone=false;c.closingResponse=null;c.expectClosing=false;
     if(c.playing)c.interruptions++;
     clearTimeout(c.responseTimer);c.speaking=true;
     transcript(c,e.item_id,'user');interrupted(c);callStatus(c,t('Je t’écoute.'),true);
@@ -128,22 +143,32 @@ function handleEvent(c,e) {
     // Transcription is for the saved notes; native audio turn-taking continues.
     error(t('Un passage n’a pas pu être transcrit. La conversation continue.'),'info');
   }else if(e.type==='response.created'){
-    clearTimeout(c.responseTimer);c.responseId=e.response.id;
+    clearTimeout(c.responseTimer);c.responseId=e.response.id;c.responseSpoken=false;
+    if(c.expectClosing){c.closingResponse=e.response.id;c.expectClosing=false;}
     c.responseTimer=setTimeout(()=>{if(call===c)void endCall(t('Le service vocal ne répond plus. Tu peux relancer l’appel.'));},45000);
     callStatus(c,t('Le coach prépare sa réponse…'));
   }else if(e.type==='response.output_item.added' && e.item?.role==='assistant'){
     c.currentItems.add(e.item.id);transcript(c,e.item.id,'assistant');
   }else if(e.type==='response.output_audio_transcript.done'){
-    transcript(c,e.item_id,'assistant').text=e.transcript||'';
+    transcript(c,e.item_id,'assistant').text=e.transcript||'';c.responseSpoken=true;
   }else if(e.type==='output_audio_buffer.started'){
-    c.playing=true;callStatus(c,t('Le coach te répond.'));
+    clearTimeout(c.finishTimer);c.playing=true;callStatus(c,t('Le coach te répond.'));
   }else if(e.type==='output_audio_buffer.cleared'){
     interrupted(c);callStatus(c,t('Je t’écoute.'),c.speaking);
   }else if(e.type==='output_audio_buffer.stopped'){
-    c.playing=false;c.currentItems.clear();callStatus(c,t('Je t’écoute.'),c.speaking);
+    c.playing=false;c.currentItems.clear();callStatus(c,t('Je t’écoute.'),c.speaking);finishWhenQuiet(c);
   }else if(e.type==='response.done'){
     if(e.response?.id!==c.responseId)return;
     clearTimeout(c.responseTimer);
+    const finish=e.response.output?.find(item=>item.type==='function_call'&&item.name==='finish_bubble');
+    if(e.response.status==='completed'&&finish&&!c.speaking){
+      send(c,{type:'conversation.item.create',item:{type:'function_call_output',call_id:finish.call_id,output:'The bubble will close after your brief farewell.'}});
+      if(c.responseSpoken){c.closingDone=true;finishWhenQuiet(c);}else{
+      c.expectClosing=true;
+      send(c,{type:'response.create',response:{tool_choice:'none',instructions:getLanguage()==='en'?'Say only: Thank you for this time together. Take care.':'Dis uniquement : Merci pour ce moment partagé. Bonne continuation.'}});
+      }
+    }
+    if(e.response.status==='completed'&&e.response.id===c.closingResponse){c.closingDone=true;finishWhenQuiet(c);}
     if(e.response.status==='failed'||e.response.status==='incomplete'){
       void endCall(t('Le service vocal n’a pas pu terminer sa réponse. Tu peux relancer l’appel.'));
     }
@@ -184,15 +209,16 @@ async function startCall(){
     if(call!==c){await api('call/end',{callId:c.callId,messages:[]});return;}
     await c.peer.setRemoteDescription({type:'answer',sdp:result.sdp});
     c.connectionTimer=setTimeout(()=>{if(call===c&&c.channel.readyState!=='open')void endCall(t('La connexion audio n’a pas abouti. Réessaie.'));},20000);
-  }catch(e){await endCall();throw new Error(e.name==='NotAllowedError'?t('Le micro n’est pas autorisé. Tu peux continuer par écrit ou autoriser le micro dans ton navigateur.'):e.message);}
+  }catch(e){await endCall('', 'error');throw new Error(e.name==='NotAllowedError'?t('Le micro n’est pas autorisé. Tu peux continuer par écrit ou autoriser le micro dans ton navigateur.'):e.message);}
 }
 async function saveCall(){
   if(!pendingSave)return;
-  await api('call/end',pendingSave);pendingSave=null;await load();updateControls();
+  const saved=pendingSave;await api('call/end',saved);pendingSave=null;await load();updateControls();
+  if(saved.outcome==='ended'&&saved.messages.some(m=>m.role==='user'))goAfter(state.threadId,saved.callId);
 }
 async function endCall(message='',outcome=message?'error':'ended'){
   const c=call;if(!c||c.ending)return;c.ending=true;
-  clearInterval(c.ticker);clearTimeout(c.limitTimer);clearTimeout(c.connectionTimer);clearTimeout(c.responseTimer);
+  clearTimeout(c.finishTimer);clearInterval(c.ticker);clearTimeout(c.limitTimer);clearTimeout(c.connectionTimer);clearTimeout(c.responseTimer);
   // Reset the UI first. A failed transport cleanup must never leave the call stuck.
   call=null;$('call-panel').hidden=true;
   for(const cleanup of [()=>c.stream?.getTracks().forEach(t=>t.stop()),()=>c.channel?.close(),()=>c.peer.close(),()=>c.audio.pause(),()=>{c.audio.srcObject=null;}]){try{cleanup();}catch{}}
@@ -250,7 +276,11 @@ $('transcript-form').onsubmit=async event=>{
 async function init(){
   updateControls();
   try{const status=await api('status');$('config-hint').textContent=status.ready?'':t('Le service doit encore recevoir sa clé OpenAI et son code d’accès.');}catch{error(t('Le serveur n’est pas accessible.'));}
-  try{await load();}catch(e){if(e.status!==401)error(e.message);render();}
+  try{await load(new window.URLSearchParams(window.location.search).get('thread'));}catch(e){if(e.status!==401)error(e.message);render();}
+  if(invitationCode&&!authenticated){
+    try{await api('login',{code:invitationCode});await load();}
+    catch(e){$('access-error').textContent=e.message;$('access-dialog').showModal();}
+  }
   initialized=true;updateControls();
 }
 void init();

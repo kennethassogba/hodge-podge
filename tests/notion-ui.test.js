@@ -21,3 +21,17 @@ test('analysis starts on form submission without an extra consent checkbox',asyn
     assert(!s.requests.some(r=>r.path.endsWith('/publish')));
   }finally{s.dom.window.close();}
 });
+
+test('Notion uses the edited recap plus additions as its intention',async()=>{
+  const s=await setup(true);try{
+    s.document.getElementById('after-content').hidden=false;
+    s.document.getElementById('recap').value='Décision : demander à Alex sa proposition vendredi.';
+    s.dom.window.dispatchEvent(new s.dom.window.CustomEvent('bulle:recap'));
+    assert.equal(s.document.getElementById('intention').required,false);
+    s.document.getElementById('intention').value='Précision : avant 14 h.';
+    s.document.querySelector('#pages input').checked=true;
+    s.document.getElementById('investigate').click();await s.settle();
+    const request=s.requests.find(r=>r.path==='/api/notion/jobs'&&r.options.method==='POST');
+    assert.equal(JSON.parse(request.options.body).intention,'Décision : demander à Alex sa proposition vendredi.\n\nPrécision : avant 14 h.');
+  }finally{s.dom.window.close();}
+});
