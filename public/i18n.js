@@ -6,7 +6,6 @@ export const EN = {
   "Tes notes pour la prochaine fois.":"Your notes for next time.",
   "Tes échanges et notes restent disponibles dans ton espace La Bulle pendant 30 jours. Tu peux les effacer quand tu veux.":"Your conversations and notes stay available in your La Bulle space for 30 days. You can delete them whenever you like.",
   "La Bulle utilise OpenAI pour le coaching et la voix.":"La Bulle uses OpenAI for coaching and voice.",
-  "Transcription modifiable.":"You can edit the transcript.",
   "Un espace pour réfléchir à ta vie professionnelle, une question à la fois.":"A space to reflect on your working life, one question at a time.",
   "Pour l’appel, autorise ton micro. Un casque est conseillé.":"For a call, allow microphone access. Headphones are recommended.",
   "Corrige ce qui a été mal transcrit.":"Correct anything that was misheard.",
