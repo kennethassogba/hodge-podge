@@ -36,14 +36,15 @@ select{font:inherit;color:var(--ink);background:var(--surface);border:1px solid 
 .nps-field{padding:0;margin:0;border:0;min-width:0}
 .nps-field legend{font-size:13px;line-height:1.6;padding:0;margin-bottom:var(--s3)}
 .nps-scale{display:grid;grid-template-columns:repeat(11,minmax(0,1fr));gap:var(--s1)}
-.nps-choice{position:relative;margin:0!important;cursor:pointer}
-.nps-choice input{position:absolute;opacity:0;inset:0;width:100%;height:100%;margin:0;cursor:pointer}
-.nps-choice span{display:grid;place-items:center;min-height:44px;border:1px solid var(--line);border-radius:9px;background:var(--surface);font-size:14px;font-weight:600}
+.nps-choice{position:relative;margin:0!important;cursor:pointer;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
+/* The native radio owns the whole tile; decorative text must not intercept a touch. */
+.nps-choice input{appearance:none;-webkit-appearance:none;position:absolute;z-index:1;opacity:0;inset:0;width:100%;height:100%;margin:0;padding:0;border:0;cursor:pointer;touch-action:manipulation}
+.nps-choice span{pointer-events:none;display:grid;place-items:center;min-height:44px;border:1px solid var(--line);border-radius:9px;background:var(--surface);font-size:14px;font-weight:600}
 @media(hover:hover){.nps-choice:hover span{background:var(--soft)}}
 .nps-choice input:checked+span{background:var(--accent);border-color:var(--accent);color:var(--white)}
 .nps-choice input:focus-visible+span{outline:2px solid var(--focus);outline-offset:3px}
 .nps-choice input:disabled+span{opacity:.5;cursor:default}
-.nps-choice:active span{transform:translateY(1px)}
+.nps-choice:active span{border-color:var(--accent)}
 #feedback-dialog .rating-help{margin:var(--s2) 0 0!important;font-size:11px!important}
 #feedback-dialog .dialog-actions{margin-top:var(--s2)}
 #feedback-dialog .form-error:empty{display:none}

@@ -1,7 +1,7 @@
-import { takeAccessCode, afterLink, goAfter } from './access.js?v=0.5.2';
-import { voiceResponseDiagnostic } from './voice-diagnostics.js?v=0.5.2';
-import { QUESTIONS, QUESTIONS_EN } from './coaching-protocol.js?v=0.5.2';
-import { t, getLanguage, initLanguage, setLanguage } from './i18n.js?v=0.5.2';
+import { takeAccessCode, afterLink, goAfter } from './access.js?v=0.5.3';
+import { voiceResponseDiagnostic } from './voice-diagnostics.js?v=0.5.3';
+import { QUESTIONS, QUESTIONS_EN } from './coaching-protocol.js?v=0.5.3';
+import { t, getLanguage, initLanguage, setLanguage } from './i18n.js?v=0.5.3';
 const invitationCode = takeAccessCode();
 initLanguage(document);
 
@@ -354,6 +354,7 @@ function renderFeedback(){
 $('language').onchange=()=>{setLanguage($('language').value,document);error();render();};
 for(let i=0;i<=10;i++){
   const label=node('label','nps-choice'),input=document.createElement('input');
+  input.id=`feedback-recommendation-${i}`;label.htmlFor=input.id;
   input.type='radio';input.name='recommendation';input.value=String(i);input.required=true;input.setAttribute('aria-describedby','nps-help');
   label.append(input,node('span','',String(i)));$('feedback-rating').append(label);
 }

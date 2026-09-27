@@ -61,3 +61,29 @@ test('unavailable email never pretends to send; failed recap still permits a man
     assert(!s.requests.some(r=>r.path==='/api/recap/email'));assert.equal(s.el('after-feedback-form').hidden,false);
   }finally{s.dom.window.close();}
 });
+
+for (const language of ['fr', 'en']) test(`rating tiles select every score and submit after email (${language})`,async()=>{
+  const s=await setup({language});try{
+    s.el('email-open').click();s.el('email-address').value='test@example.com';
+    s.el('email-send').focus();s.el('email-send').click();await s.settle();
+    assert.equal(s.el('email-form').hidden,true);
+    assert.equal(s.document.activeElement,s.el('email-open'));
+    // No focus/click in a feedback text field before selecting a score.
+    s.el('after-feedback-send').click();await s.settle();
+    assert.equal(s.requests.filter(r=>r.path==='/api/feedback').length,0);
+    const labels=[...s.el('after-rating').querySelectorAll('label')];
+    assert.equal(labels.length,11);
+    for(let score=0;score<=10;score++){
+      labels[score].querySelector('span').click();
+      const checked=[...s.el('after-rating').querySelectorAll('input:checked')];
+      assert.equal(checked.length,1);assert.equal(checked[0].value,String(score));
+      assert.equal(labels[score].control,checked[0]);
+    }
+    // Zero is a valid score, not a missing answer.
+    labels[0].click();s.el('after-feedback-send').click();await s.settle();
+    const submissions=s.requests.filter(r=>r.path==='/api/feedback');
+    assert.equal(submissions.length,1);assert.equal(submissions[0].data.recommendation,0);
+    assert.equal(submissions[0].data.language,language);
+    assert.equal(s.el('after-feedback-thanks').hidden,false);
+  }finally{s.dom.window.close();}
+});

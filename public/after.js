@@ -121,6 +121,8 @@ $('email-form').onsubmit = async event => {
     await api('recap/email', {...selection, text: $('recap').value, email: $('email-address').value,
       includeTranscript: $('include-transcript').checked});
     $('email-status').textContent = l('Ton email est envoyé. Pense à vérifier les indésirables.', 'Your email has been sent. Check your spam folder too.');
+    // Restore focus before hiding the form, including on mobile browsers with an open keyboard.
+    if ($('email-form').contains(document.activeElement)) $('email-open').focus({preventScroll: true});
     $('email-form').hidden = true;
   } catch (error) {
     $('email-status').textContent = language === 'fr' ? error.message : 'Sending could not be confirmed. Check your address, then try again; the same email will not be sent twice.';
@@ -129,6 +131,7 @@ $('email-form').onsubmit = async event => {
 for (let i = 0; i <= 10; i++) {
   const label = document.createElement('label'), input = document.createElement('input'), number = document.createElement('span');
   label.className = 'nps-choice'; input.type = 'radio'; input.name = 'recommendation'; input.value = String(i);
+  input.id = `after-recommendation-${i}`; label.htmlFor = input.id;
   input.required = true; input.setAttribute('aria-describedby', 'after-nps-help'); number.textContent = String(i);
   label.append(input, number); $('after-rating').append(label);
 }
