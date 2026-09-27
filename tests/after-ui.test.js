@@ -4,8 +4,8 @@ import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
 import {JSDOM} from 'jsdom';
 
-async function setup({language='fr',failRecap=false,stored=null,oauth=false,emailAvailable=true}={}){
-  const dom=new JSDOM(await readFile('public/notion.html','utf8'),{url:'https://test.example/notion'+(oauth?'?result=connected':'?thread=test-thread&call=test-call')});
+async function setup({language='fr',failRecap=false,stored=null,oauth=false,emailAvailable=true,url=null}={}){
+  const dom=new JSDOM(await readFile('public/notion.html','utf8'),{url:url||'https://test.example/notion'+(oauth?'?result=connected':'?thread=test-thread&call=test-call')});
   const {document}=dom.window,requests=[],copies=[];
   document.getElementById('language').value=language;
   dom.window.localStorage.setItem('hp_language',language);
@@ -85,5 +85,14 @@ for (const language of ['fr', 'en']) test(`rating tiles select every score and s
     assert.equal(submissions.length,1);assert.equal(submissions[0].data.recommendation,0);
     assert.equal(submissions[0].data.language,language);
     assert.equal(s.el('after-feedback-thanks').hidden,false);
+  }finally{s.dom.window.close();}
+});
+
+test('a direct English after-bubble link uses English recap and feedback without changing the selection',async()=>{
+  const s=await setup({url:'https://test.example/notion?thread=test-thread&call=test-call&lang=en'});try{
+    assert.equal(s.el('recap-title').textContent,'Your recap');
+    assert.equal(s.el('language').value,'en');
+    assert.equal(s.requests.find(r=>r.path==='/api/recap').data.language,'en');
+    assert.match(s.requests[0].path,/thread=test-thread&language=en&call=test-call/);
   }finally{s.dom.window.close();}
 });

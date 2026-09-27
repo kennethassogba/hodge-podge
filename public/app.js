@@ -1,7 +1,7 @@
-import { takeAccessCode, afterLink, goAfter } from './access.js?v=0.5.6';
-import { voiceResponseDiagnostic } from './voice-diagnostics.js?v=0.5.6';
-import { QUESTIONS, QUESTIONS_EN } from './coaching-protocol.js?v=0.5.6';
-import { t, getLanguage, initLanguage, setLanguage } from './i18n.js?v=0.5.6';
+import { takeAccessCode, afterLink, goAfter } from './access.js?v=0.5.7';
+import { voiceResponseDiagnostic } from './voice-diagnostics.js?v=0.5.7';
+import { QUESTIONS, QUESTIONS_EN } from './coaching-protocol.js?v=0.5.7';
+import { t, getLanguage, initLanguage, setLanguage } from './i18n.js?v=0.5.7';
 const invitationCode = takeAccessCode();
 initLanguage(document);
 

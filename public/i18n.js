@@ -125,6 +125,8 @@ export function initLanguage(document) {
     for(const attr of ['aria-label','placeholder','data-prompt']) {const key=node.getAttribute(attr);if(EN[key])originals.push({node,key,attr});}
   });
   let chosen='fr';try{chosen=window.localStorage.getItem('hp_language')||'fr';}catch{}
+  const requested=new window.URLSearchParams(window.location.search).get('lang');
+  if(requested==='en'||requested==='fr')chosen=requested;
   setLanguage(chosen,document);
 }
 export function setLanguage(value,document) {

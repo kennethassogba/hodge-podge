@@ -561,3 +561,23 @@ test('blocked audio resume asks for one tap and never advances the protocol',asy
     assert.equal(s.document.getElementById('call-hint').hidden,true);
   }finally{s.close();}
 });
+
+test('language links override the saved choice and work with access-code invitations',async()=>{
+  const s=await setup({language:'fr',url:'https://test.example/?lang=en#access=valid-passphrase',signedIn:false,autoCall:false});try{
+    assert.equal(s.document.documentElement.lang,'en');
+    assert.equal(s.document.getElementById('call-button').textContent.trim(),'Call');
+    assert.equal(s.window.localStorage.getItem('hp_language'),'en');
+    assert.equal(s.window.location.search,'?lang=en');assert.equal(s.window.location.hash,'');
+    s.document.getElementById('call-button').click();await s.settle();
+    assert.equal(s.http.find(r=>r.path==='/api/call').data.language,'en');
+    assert.match(s.requests()[0].response.instructions,/Welcome to this bubble/);
+  }finally{s.close();}
+  for(const [lang,expected]of [['fr','fr'],['unknown','en']]){
+    const next=await setup({language:'en',url:'https://test.example/?lang='+lang,autoCall:false});try{
+      assert.equal(next.document.documentElement.lang,expected);
+      next.document.getElementById('language').value='fr';
+      next.document.getElementById('language').dispatchEvent(new next.window.Event('change'));
+      assert.equal(next.document.documentElement.lang,'fr');
+    }finally{next.close();}
+  }
+});

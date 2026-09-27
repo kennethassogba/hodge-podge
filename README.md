@@ -84,6 +84,17 @@ Pour essayer les agents Notion, ouvrir **Continuer dans Notion** dans l’après
 espace, compléter le récap si nécessaire et sélectionner 1 à 3 pages. Cliquer sur **Examiner ces
 documents**, puis relire la proposition avant de la publier.
 
+Pour partager un lien qui ouvre directement la bonne langue :
+
+- Anglais : https://bulle.hodge-podge.workers.dev/?lang=en
+- Français : https://bulle.hodge-podge.workers.dev/?lang=fr
+- Avec le code d’invitation : `https://bulle.hodge-podge.workers.dev/?lang=en#access=CODE_ENCODE`
+
+Le paramètre `lang` accepte `en` ou `fr` et prime sur la préférence enregistrée. La langue choisie
+est mémorisée pour la suite du parcours ; le sélecteur reste utilisable. Sans paramètre valide,
+l’application conserve la préférence enregistrée ou démarre en français. Cela fonctionne aussi
+sur `/notion?lang=en` pour accéder directement à l’après-bulle.
+
 ## Développement local
 
 Prérequis : Node.js 22 ou supérieur, npm, une clé API OpenAI disposant de crédits. ChatGPT Pro ne

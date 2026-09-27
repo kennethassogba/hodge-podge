@@ -6,6 +6,8 @@ const read = key => {try{return JSON.parse(window.sessionStorage.getItem(key));}
 const save = (key, value) => {try{window.sessionStorage.setItem(key, JSON.stringify(value));}catch{}};
 const draftKey = () => `hp_after_draft:${context.scope}:${language}`;
 const params = new window.URLSearchParams(window.location.search);
+const requestedLanguage = params.get('lang');
+if (requestedLanguage === 'en' || requestedLanguage === 'fr') $('language').value = requestedLanguage;
 let selection = params.has('thread') ? {threadId: params.get('thread'), callId: params.get('call')} : read('hp_after_selection');
 
 function translate() {
