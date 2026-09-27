@@ -28,7 +28,7 @@ before(async()=>{
       const result=draft?{text:'Je souhaite réfléchir avant de répondre.'}:latest.includes('pas d’action')?{reply:'D’accord. Avec quoi repars-tu de cet échange ?',action:'cloturer'}:{reply:'Qu’aimerais-tu éclaircir en premier ?',action:'clarifier'};
       return Response.json({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify(result)}]}]});
     }}));
-  const db=await mf.getD1Database('DB');const sql=(await Promise.all(['0001_initial.sql','0002_feedback.sql'].map(f=>readFile('migrations/'+f,'utf8')))).join('\n');
+  const db=await mf.getD1Database('DB');const sql=(await Promise.all(['0001_initial.sql','0002_feedback.sql','0004_nps.sql'].map(f=>readFile('migrations/'+f,'utf8')))).join('\n');
   for(const statement of sql.split(';').filter(x=>x.trim()))await db.prepare(statement).run();
 });
 after(async()=>{await mf?.dispose();});
@@ -82,29 +82,31 @@ test('English prompts, transcription language, noise reduction and unrestricted 
   await request('chat',{data:{threadId:threadA,id:crypto.randomUUID(),text:'Hello',language:'en'}});assert.match(lastInput.instructions,/Speak natural English/);
   await request('draft',{data:{threadId:threadA,language:'en'}});assert.match(lastInput.instructions,/note in English/);
 });
-test('feedback requires consent, validates scores, is private and editable, and admin has only safe projections',async()=>{
+test('feedback submits once, validates NPS answers, isolates owners and keeps admin projections private',async()=>{
   const r=await request('call',{data:{threadId:threadA,sdp:'v=0\r\n'}});const callId=r.data.callId;
   assert.equal(voiceConfig.audio.input.noise_reduction.type,'far_field');
-  const value={callId,clarity:0,quality:10,comment:'An explicit test comment',share:true};
+  const value={callId,recommendation:0,reason:'An explicit reason',valueEstimate:'30 minutes saved',suggestions:'Larger buttons'};
   assert.equal((await request('feedback',{data:value})).status,404);
   await request('call/end',{data:{callId,messages:[{role:'user',text:'Private sentence, must never be visible to the team.'}],outcome:'error',durationSeconds:65,transcriptionFailures:1}});
   assert.equal((await request('feedback',{cookie:cookieB,data:value})).status,404);
-  assert.equal((await request('feedback',{data:{...value,share:false}})).status,400);
-  assert.equal((await request('feedback',{data:{...value,clarity:11}})).status,400);
-  assert.equal((await request('feedback',{data:{...value,clarity:1.5}})).status,400);
-  assert.equal((await request('feedback',{data:{...value,clarity:null}})).status,400);
+  assert.equal((await request('feedback',{data:{...value,recommendation:11}})).status,400);
+  assert.equal((await request('feedback',{data:{...value,recommendation:1.5}})).status,400);
+  assert.equal((await request('feedback',{data:{...value,recommendation:null}})).status,400);
+  assert.equal((await request('feedback',{data:{...value,recommendation:-1}})).status,400);
+  assert.equal((await request('feedback',{data:{...value,reason:'x'.repeat(2001)}})).status,400);
+  assert.equal((await request('feedback',{data:{...value,suggestions:42}})).status,400);
   assert.equal((await request('feedback',{data:value})).status,200);
   assert.equal((await request('admin/feedback')).status,401);
   assert.equal((await request('admin/login',{data:{code:'integration-test-access'}})).status,401);
   const a=await request('admin/login',{data:{code:'test-only-admin-code-distinct'}});const admin=a.headers.get('set-cookie').split(';')[0];
   assert.match(a.headers.get('set-cookie'),/HttpOnly/);assert.match(a.headers.get('set-cookie'),/Path=\/api\/admin/);
   let dashboard=(await request('admin/feedback',{cookie:admin})).data;
-  assert.equal(dashboard.ratings.responses,1);assert.equal(dashboard.ratings.clarity,0);assert.equal(dashboard.summary.errors,1);
-  assert.equal(dashboard.entries[0].comment,value.comment);assert.doesNotMatch(JSON.stringify(dashboard),/Private sentence|owner|provider_id|thread_id|token_hash/);
-  await request('feedback',{data:{...value,clarity:8}});dashboard=(await request('admin/feedback',{cookie:admin})).data;
-  assert.equal(dashboard.ratings.responses,1);assert.equal(dashboard.ratings.clarity,8);
+  assert.equal(dashboard.ratings.responses,1);assert.equal(dashboard.ratings.nps,-100);assert.equal(dashboard.summary.errors,1);
+  assert.equal(dashboard.entries[0].reason,value.reason);assert.equal(dashboard.entries[0].value_estimate,value.valueEstimate);assert.equal(dashboard.entries[0].suggestions,value.suggestions);assert.doesNotMatch(JSON.stringify(dashboard),/Private sentence|owner|provider_id|thread_id|token_hash/);
+  await request('feedback',{data:{...value,recommendation:10}});dashboard=(await request('admin/feedback',{cookie:admin})).data;
+  assert.equal(dashboard.ratings.responses,1);assert.equal(dashboard.ratings.nps,-100);assert.equal((await request('state?thread='+threadA)).data.calls.find(c=>c.id===callId).feedback_submitted,1);
   await request('feedback/'+callId,{cookie:cookieB,method:'DELETE'});assert.equal((await request('admin/feedback',{cookie:admin})).data.ratings.responses,1);
-  await request('feedback/'+callId,{method:'DELETE'});assert.equal((await request('admin/feedback',{cookie:admin})).data.ratings.responses,0);
+  await request('feedback/'+callId,{method:'DELETE'});assert.equal((await request('admin/feedback',{cookie:admin})).data.ratings.responses,0);assert.equal((await request('admin/feedback',{cookie:admin})).data.ratings.nps,null);
   await request('feedback',{data:value});
   await request('admin/logout',{cookie:admin,data:{}});assert.equal((await request('admin/feedback',{cookie:admin})).status,401);
   const saved=(await request('state?thread='+threadA)).data.messages.find(m=>m.text.startsWith('Private sentence'));
@@ -113,11 +115,32 @@ test('feedback requires consent, validates scores, is private and editable, and 
   assert.equal((await request('state?thread='+threadA)).data.messages.find(m=>m.id===saved.id).text,'Corrected by the speaker.');
   assert.equal((await request('messages/'+saved.id,{method:'DELETE'})).status,200);
 });
+test('NPS uses all valid responses, handles boundaries and excludes the previous questionnaire',async()=>{
+  const db=await mf.getD1Database('DB');const owner=(await db.prepare('SELECT owner FROM threads WHERE id=?').bind(threadA).first()).owner;
+  // The previous test left a zero. Add 6,7,8,9,10: two promoters and two detractors out of six.
+  const added=[];
+  for(const recommendation of [6,7,8,9,10]){
+    const callId=crypto.randomUUID();added.push(callId);
+    await db.prepare('INSERT INTO calls(id,owner,thread_id,created_at,ended_at) VALUES(?,?,?,?,?)').bind(callId,owner,threadA,Date.now(),Date.now()).run();
+    assert.equal((await request('feedback',{data:{callId,recommendation}})).status,200);
+  }
+  const legacyId=crypto.randomUUID();added.push(legacyId);
+  await db.prepare('INSERT INTO calls(id,owner,thread_id,created_at,ended_at) VALUES(?,?,?,?,?)').bind(legacyId,owner,threadA,Date.now(),Date.now()).run();
+  await db.prepare('INSERT INTO feedback(call_id,owner,clarity,quality,comment,language,created_at,updated_at) VALUES(?,?,10,10,?,\'fr\',?,?)').bind(legacyId,owner,'Previous questionnaire',Date.now(),Date.now()).run();
+  const login=await request('admin/login',{data:{code:'test-only-admin-code-distinct'}});const admin=login.headers.get('set-cookie').split(';')[0];
+  let data=(await request('admin/feedback',{cookie:admin})).data;
+  assert.equal(data.ratings.responses,6);assert.equal(data.ratings.promoters,2);assert.equal(data.ratings.passives,2);assert.equal(data.ratings.detractors,2);assert.equal(data.ratings.nps,0);
+  assert.ok(data.entries.some(e=>e.recommendation===null&&e.comment==='Previous questionnaire'));
+  await request('feedback/'+added[0],{method:'DELETE'});
+  data=(await request('admin/feedback',{cookie:admin})).data;assert.equal(data.ratings.nps,20);
+  for(const callId of added)await db.prepare('DELETE FROM calls WHERE id=?').bind(callId).run();
+});
 test('notes can be corrected and removed; deletion removes personal data',async()=>{
   await request('notes',{data:{id:noteA,text:'Correction choisie.'}});assert.equal((await request('state')).data.notes[0].text,'Correction choisie.');
   await request('notes/'+noteA,{method:'DELETE'});assert.equal((await request('state')).data.notes.length,0);
   await request('data',{method:'DELETE'});assert.equal((await request('state')).status,401);
   const db=await mf.getD1Database('DB');assert.equal((await db.prepare('SELECT count(*) as n FROM messages').first()).n,0);
   assert.equal((await db.prepare('SELECT count(*) as n FROM feedback').first()).n,0);
+  assert.equal((await db.prepare('SELECT count(*) as n FROM feedback_nps').first()).n,0);
   assert.equal((await db.prepare('SELECT count(*) as n FROM calls').first()).n,0);
 });

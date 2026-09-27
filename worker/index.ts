@@ -87,7 +87,7 @@ async function route(request: Request, env: Bindings) {
     const origin = request.headers.get('origin');
     if (origin !== url.origin || request.headers.get('sec-fetch-site') === 'cross-site') fail(403, 'Origine non autorisée.');
   }
-  if (path === '/api/status' && method === 'GET') return json({ ready: Boolean(env.OPENAI_API_KEY && (env.APP_ACCESS_CODE?.length ?? 0) >= 12), voice: 'realtime', turnDetection: 'semantic_vad', version: '0.4.0' });
+  if (path === '/api/status' && method === 'GET') return json({ ready: Boolean(env.OPENAI_API_KEY && (env.APP_ACCESS_CODE?.length ?? 0) >= 12), voice: 'realtime', turnDetection: 'semantic_vad', version: '0.4.1' });
   if (path === '/api/login' && method === 'POST') {
     const input = await body(request);
     await quota(env, `login:${await hash(request.headers.get('cf-connecting-ip') ?? 'local')}`, 10, 600);
@@ -129,11 +129,20 @@ async function route(request: Request, env: Bindings) {
         SUM(CASE WHEN c.outcome='error' THEN 1 ELSE 0 END) AS errors, AVG(c.duration_seconds) AS average_seconds,
         COALESCE(SUM(c.interruptions),0) AS interruptions, COALESCE(SUM(c.transcription_failures),0) AS transcription_failures
         FROM calls c JOIN visitors v ON v.id=c.owner WHERE v.expires_at>?`).bind(now()).first();
-      const ratings=await env.DB.prepare(`SELECT COUNT(*) AS responses, AVG(f.clarity) AS clarity, AVG(f.quality) AS quality
-        FROM feedback f JOIN visitors v ON v.id=f.owner WHERE v.expires_at>?`).bind(now()).first();
+      const ratings=await env.DB.prepare(`SELECT COUNT(*) AS responses,
+        COALESCE(SUM(f.recommendation>=9),0) AS promoters,
+        COALESCE(SUM(f.recommendation BETWEEN 7 AND 8),0) AS passives,
+        COALESCE(SUM(f.recommendation<=6),0) AS detractors,
+        100.0 * SUM(CASE WHEN f.recommendation>=9 THEN 1 WHEN f.recommendation<=6 THEN -1 ELSE 0 END) / NULLIF(COUNT(*),0) AS nps
+        FROM feedback_nps f JOIN visitors v ON v.id=f.owner WHERE v.expires_at>?`).bind(now()).first();
       const cursor=Number(url.searchParams.get('offset')??0);integer(cursor,1000000);
-      const entries=(await env.DB.prepare(`SELECT f.clarity,f.quality,f.comment,f.language,f.created_at,f.updated_at FROM feedback f
-        JOIN visitors v ON v.id=f.owner WHERE v.expires_at>? ORDER BY f.created_at DESC,f.call_id DESC LIMIT 50 OFFSET ?`).bind(now(),cursor).all()).results;
+      const entries=(await env.DB.prepare(`SELECT recommendation,reason,value_estimate,suggestions,clarity,quality,comment,language,created_at FROM (
+        SELECT f.call_id,f.recommendation,f.reason,f.value_estimate,f.suggestions,NULL AS clarity,NULL AS quality,NULL AS comment,f.language,f.created_at
+        FROM feedback_nps f JOIN visitors v ON v.id=f.owner WHERE v.expires_at>?
+        UNION ALL
+        SELECT f.call_id,NULL,NULL,NULL,NULL,f.clarity,f.quality,f.comment,f.language,f.created_at
+        FROM feedback f JOIN visitors v ON v.id=f.owner WHERE v.expires_at>?
+        ) ORDER BY created_at DESC,call_id DESC LIMIT 50 OFFSET ?`).bind(now(),now(),cursor).all()).results;
       return json({summary,ratings,entries,nextOffset:entries.length===50?cursor+50:null});
     }
     return fail(404,'Cette page n’existe pas.');
@@ -145,8 +154,10 @@ async function route(request: Request, env: Bindings) {
     const selected = requested ? await thread(env,user.id,requested) : threads[0]?.id as string | undefined;
     const messages = selected ? await history(env,selected) : [];
     const decisions = selected ? (await env.DB.prepare('SELECT action,created_at FROM decisions WHERE thread_id=? ORDER BY created_at DESC LIMIT 12').bind(selected).all()).results : [];
-    const calls=selected ? (await env.DB.prepare(`SELECT c.id,c.language,c.ended_at,f.clarity,f.quality,f.comment FROM calls c
-      LEFT JOIN feedback f ON f.call_id=c.id WHERE c.thread_id=? AND c.owner=? AND c.ended_at IS NOT NULL ORDER BY c.created_at DESC`).bind(selected,user.id).all()).results : [];
+    const calls=selected ? (await env.DB.prepare(`SELECT c.id,c.language,c.ended_at,
+      (f.call_id IS NOT NULL OR n.call_id IS NOT NULL) AS feedback_submitted FROM calls c
+      LEFT JOIN feedback f ON f.call_id=c.id LEFT JOIN feedback_nps n ON n.call_id=c.id
+      WHERE c.thread_id=? AND c.owner=? AND c.ended_at IS NOT NULL ORDER BY c.created_at DESC`).bind(selected,user.id).all()).results : [];
     return json({ threads, threadId: selected ?? null, messages, notes: await memory(env,user.id), decisions, calls });
   }
   if (path === '/api/threads' && method === 'POST') {
@@ -172,16 +183,22 @@ async function route(request: Request, env: Bindings) {
     const input=await body(request), callId=id(input.callId);
     const call=await env.DB.prepare('SELECT language FROM calls WHERE id=? AND owner=? AND ended_at IS NOT NULL').bind(callId,user.id).first<{language:string}>();
     if (!call) fail(404,'Appel introuvable.');
-    if (input.share!==true) fail(400,'Confirme le partage de ce retour avec l’équipe.');
-    const clarity=integer(input.clarity,10), quality=integer(input.quality,10);
-    if (typeof input.comment!=='string' || input.comment.length>2000) fail(400,'Commentaire invalide.');
-    await env.DB.prepare(`INSERT INTO feedback(call_id,owner,clarity,quality,comment,language,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)
-      ON CONFLICT(call_id) DO UPDATE SET clarity=excluded.clarity,quality=excluded.quality,comment=excluded.comment,updated_at=excluded.updated_at`)
-      .bind(callId,user.id,clarity,quality,(input.comment as string).trim(),call!.language,now(),now()).run();
+    const recommendation=integer(input.recommendation,10);
+    const answer=(value:unknown)=>value===undefined?'':typeof value==='string'&&value.length<=2000?value.trim():fail(400,'Commentaire invalide.');
+    const reason=answer(input.reason),valueEstimate=answer(input.valueEstimate),suggestions=answer(input.suggestions);
+    // Sending is the sharing action. Retries must not duplicate or overwrite a submitted response.
+    await env.DB.prepare(`INSERT INTO feedback_nps(call_id,owner,recommendation,reason,value_estimate,suggestions,language,created_at)
+      SELECT ?,?,?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM feedback WHERE call_id=?)
+      ON CONFLICT(call_id) DO NOTHING`)
+      .bind(callId,user.id,recommendation,reason,valueEstimate,suggestions,call!.language,now(),callId).run();
     return json({ok:true});
   }
   if (path.startsWith('/api/feedback/') && method==='DELETE') {
-    await env.DB.prepare('DELETE FROM feedback WHERE call_id=? AND owner=?').bind(id(path.split('/').at(-1)),user.id).run();
+    const callId=id(path.split('/').at(-1));
+    await env.DB.batch([
+      env.DB.prepare('DELETE FROM feedback WHERE call_id=? AND owner=?').bind(callId,user.id),
+      env.DB.prepare('DELETE FROM feedback_nps WHERE call_id=? AND owner=?').bind(callId,user.id),
+    ]);
     return json({ok:true});
   }
   if (path.startsWith('/api/messages/') && (method==='PATCH'||method==='DELETE')) {

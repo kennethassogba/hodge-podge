@@ -4,13 +4,14 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#f4f3ed"><meta name="description" content="Un espace pour parler, prendre le temps de réfléchir et retrouver le fil. Hodge Podge, projet de hackathon X-IA.">
   <title>La Bulle — Hodge Podge</title>
-  <link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css?v=0.4.0">
-  <script type="module" src="/app.js?v=0.4.0"></script>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css?v=0.4.1">
+  <script type="module" src="/app.js?v=0.4.1"></script>
 </head>
 <body>
   <a class="skip-link" href="#message">Aller à la conversation</a>
   <header class="masthead">
     <a href="/" class="brand" aria-label="La Bulle, accueil"><span class="brand-symbol" aria-hidden="true">b.</span><span>la bulle<span class="byline">par Hodge Podge</span></span></a>
+    <nav class="experience-nav" aria-label="Explorer La Bulle"><a href="/" aria-current="page"><span>La bulle</span></a><a href="/notion" id="notion-next"><span>L’après-bulle</span><span class="nav-tag">Notion</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></a></nav>
     <div class="header-actions"><label for="language" class="sr-only">Langue</label><select id="language"><option value="fr">Français</option><option value="en">English</option></select><button class="quiet" id="about-button">À propos</button></div>
   </header>
   <main class="workspace">
@@ -46,35 +47,34 @@
         <div id="messages"></div>
         <p id="typing" class="typing" hidden>Le coach prend un instant…</p>
       </div>
-      <div id="feedback-panel" class="feedback-panel" hidden><div id="feedback-call-picker" hidden><label for="feedback-call">Appel</label> <select id="feedback-call"></select></div><p id="feedback-prompt">Comment as-tu vécu cette bulle ? Ton retour est facultatif.</p><button id="feedback-button" class="text-button">Donner mon avis</button><button id="feedback-delete" class="text-button" hidden>Retirer mon retour</button></div>
+      <div id="feedback-panel" class="feedback-panel" hidden><div id="feedback-call-picker" hidden><label for="feedback-call">Appel</label> <select id="feedback-call"></select></div><p id="feedback-prompt">Un retour sur ta bulle ?</p><button id="feedback-button" class="text-button">Donner mon avis</button></div>
       <form id="composer" class="composer">
         <label for="message" class="sr-only">Ton message</label>
         <textarea id="message" rows="2" maxlength="6000" placeholder="Écris ce qui te vient…"></textarea>
         <button type="submit" id="send-button" class="send" aria-label="Envoyer le message">↑</button>
       </form>
-      <p id="notion-next" class="composer-footer" hidden><a href="/notion.html">Poursuivre avec mes documents Notion ↗</a></p>
       <div class="composer-footer"><span>Tu peux aussi en parler de vive voix.</span><button id="draft-button" class="text-button">Garder quelques notes</button></div>
     </section>
     <aside class="notes-panel" aria-label="Notes conservées">
       <div class="notes-title"><h2>Ce que je garde</h2><button id="add-note" class="quiet icon-button" aria-label="Ajouter une note">＋</button></div>
-      <p class="muted small">Tes mots, pour retrouver le fil.<br>Rien n’est ajouté sans ton accord.</p>
+      <p class="muted small">Tes notes pour la prochaine fois.</p>
       <div id="notes"></div>
       <div class="note-empty" id="note-empty"><span aria-hidden="true">“</span><p>Une pensée à garder ?<br>Elle trouvera sa place ici.</p></div>
-      <details class="privacy"><summary>Où restent mes échanges ?</summary><p>Le fil et les transcriptions sont conservés dans l’espace de ce navigateur, qui expire après 30 jours. Les notes approuvées servent de mémoire au coach. L’audio brut n’est pas enregistré par cette application. Les échanges sont transmis à OpenAI.</p><p>Effacer ton espace supprime les échanges, notes, retours et données d’appels de notre base active. Cela n’efface pas immédiatement les traces chez les fournisseurs : OpenAI peut conserver des journaux de sécurité jusqu’à 30 jours, avec des exceptions légales ou de sécurité. Cloudflare garde un historique de restauration de 7 jours sur l’offre gratuite (30 jours sur l’offre payante).</p><p>L’API OpenAI n’utilise pas les échanges pour entraîner ses modèles par défaut, sauf partage volontaire activé. Nous ne promettons pas une conservation nulle chez les fournisseurs.</p><p>L’équipe voit les statistiques techniques des appels et uniquement les avis que tu choisis de partager. Ce tableau n’affiche ni tes échanges ni tes notes. Les administrateurs de l’hébergement ont un accès technique à la base. Les données de cet espace expirent 30 jours après son ouverture et sont purgées chaque jour.</p><p><a href="https://developers.openai.com/api/docs/guides/your-data" target="_blank" rel="noopener noreferrer">Politique OpenAI</a> · <a href="https://developers.cloudflare.com/d1/reference/time-travel/" target="_blank" rel="noopener noreferrer">Sauvegardes Cloudflare</a></p><button id="erase-button" class="text-button">Effacer mon espace</button></details>
-      <p class="small muted transcript-notice">La transcription peut se tromper. Tu peux corriger ou effacer tes passages avant de préparer une note.</p>
+      <details class="privacy"><summary>Où restent mes échanges ?</summary><p>Tes échanges et notes sont conservés 30 jours sur nos serveurs, dans un espace lié à ce navigateur.</p><p>OpenAI traite tes échanges pour le coaching et la voix. <a href="https://developers.openai.com/api/docs/guides/your-data" target="_blank" rel="noopener noreferrer">Politique OpenAI</a></p><button id="erase-button" class="text-button">Effacer mon espace</button></details>
+      <p class="small muted transcript-notice">Transcription modifiable.</p>
     </aside>
   </main>
-  <footer class="footer"><span>Hodge Podge · X-IA Hackathon 2026</span><a href="/team.html">Espace équipe</a><span>Version 0.4.0</span></footer>
+  <footer class="footer"><span>Hodge Podge · X-IA Hackathon 2026</span><a href="/team.html">Espace équipe</a><span>Version 0.4.1</span></footer>
   <dialog id="access-dialog"><form id="access-form"><p class="dialog-kicker">Bienvenue</p><h2>Ouvrir ta bulle</h2><p>Entre le code d’accès de l’équipe. Chaque navigateur garde son propre espace.</p><label for="access-code">Code d’accès</label><input id="access-code" type="password" autocomplete="current-password" required maxlength="200"><p id="access-error" class="form-error" role="alert"></p><div class="dialog-actions"><button type="button" data-close="access-dialog" class="quiet">Annuler</button><button type="submit" class="primary" id="access-submit">Entrer</button></div><p class="small muted" id="config-hint"></p></form></dialog>
   <dialog id="note-dialog"><form id="note-form"><p class="dialog-kicker">À relire, avec tes mots</p><h2>Ce que tu veux garder</h2><p>Modifie librement cette note. Elle sera partagée avec le coach lors des prochaines séances.</p><label for="note-text">Ta note</label><textarea id="note-text" rows="6" maxlength="2500" required></textarea><p id="note-error" class="form-error" role="alert"></p><div class="dialog-actions"><button type="button" data-close="note-dialog" class="quiet">Ne pas garder</button><button type="submit" id="note-save" class="primary">Conserver</button></div></form></dialog>
-  <dialog id="about-dialog"><h2>Un peu d’espace pour penser.</h2><p>La Bulle est un projet de Hodge Podge : Séb, Fano et Kenneth, pour le hackathon X-IA. Tu échanges avec une IA, pas avec Séb.</p><p>Une question à la fois, des silences qui ont leur place et des notes que tu choisis de conserver. Ce prototype accompagne une réflexion professionnelle ; il ne remplace pas un accompagnement médical.</p><p>Pour l’appel : garde cette page ouverte et autorise le micro. Un casque est conseillé. </p><button data-close="about-dialog" class="primary">C’est compris</button></dialog>
+  <dialog id="about-dialog"><h2>Un peu d’espace pour penser.</h2><p>La Bulle est un projet de Hodge Podge : Séb, Fano et Kenneth, pour le hackathon X-IA. Tu échanges avec une IA, pas avec Séb.</p><p>Un espace pour réfléchir à ta vie professionnelle, une question à la fois.</p><p>Pour l’appel, autorise ton micro. Un casque est conseillé.</p><button data-close="about-dialog" class="primary">C’est compris</button></dialog>
   <dialog id="confirm-dialog"><h2 id="confirm-title">Confirmer</h2><p id="confirm-description"></p><div class="dialog-actions"><button id="confirm-no" class="quiet">Annuler</button><button id="confirm-yes" class="danger">Effacer</button></div></dialog>
-  <dialog id="feedback-dialog"><form id="feedback-form"><p class="dialog-kicker">Retour facultatif</p><h2 tabindex="-1" autofocus>Comment était cette bulle ?</h2><p>Seules tes réponses ci-dessous seront partagées avec Hodge Podge. Ni la conversation ni tes notes ne sont jointes. Évite les noms ou informations confidentielles dans ton commentaire.</p>
-    <label for="feedback-clarity">Cette bulle t’a-t-elle aidé à y voir plus clair ?</label><select id="feedback-clarity" required><option value="">Choisir une note</option></select><p class="rating-help">0 : pas du tout · 10 : beaucoup</p>
-    <label for="feedback-quality">Comment as-tu vécu l’échange ?</label><select id="feedback-quality" required><option value="">Choisir une note</option></select><p class="rating-help">0 : très mal · 10 : très bien</p>
-    <label for="feedback-comment">Quelque chose t’a gêné ou t’a manqué ? (facultatif)</label><textarea id="feedback-comment" rows="3" maxlength="2000"></textarea>
-    <label class="checkbox-label"><input id="feedback-share" type="checkbox" required> <span>Je choisis de partager ces réponses avec l’équipe.</span></label><p class="small muted">Tu peux modifier ou retirer ce retour depuis cette séance. Il disparaît aussi si tu effaces ton espace.</p><p id="feedback-error" class="form-error" role="alert"></p>
-    <div class="dialog-actions"><button type="button" data-close="feedback-dialog">Pas maintenant</button><button id="feedback-submit" class="primary">Partager mon retour</button></div></form></dialog>
-  <dialog id="transcript-dialog"><form id="transcript-form"><h2>Corriger ce passage</h2><p>Cette correction sera utilisée pour les prochaines notes. Les notes déjà conservées restent à modifier séparément.</p><label for="transcript-text">Ce que tu as dit</label><textarea id="transcript-text" rows="5" maxlength="6000" required></textarea><p id="transcript-error" class="form-error" role="alert"></p><div class="dialog-actions"><button type="button" data-close="transcript-dialog">Annuler</button><button id="transcript-save" class="primary">Enregistrer</button></div></form></dialog>
+  <dialog id="feedback-dialog"><form id="feedback-form"><div class="feedback-heading"><h2 tabindex="-1" autofocus>Ton retour</h2><button type="button" class="quiet feedback-close" data-close="feedback-dialog" aria-label="Fermer">×</button></div><p class="feedback-intro">Merci de nous aider à améliorer La Bulle.</p>
+    <fieldset class="nps-field"><legend>Quelle est la probabilité que tu recommandes une bulle de coaching à un ami ou un collègue ?</legend><div id="feedback-rating" class="nps-scale"></div><p class="rating-help" id="nps-help">0 = Pas du tout probable · 10 = Extrêmement probable</p></fieldset>
+    <label for="feedback-reason">Quelle est la principale raison pour la note que tu viens de donner ?</label><textarea id="feedback-reason" rows="2" maxlength="2000"></textarea>
+    <label for="feedback-value">Si cette bulle a créé de la valeur pour toi ou pour d’autres, merci d’en donner une estimation approximative en argent, en temps ou autre.</label><textarea id="feedback-value" rows="2" maxlength="2000"></textarea>
+    <label for="feedback-suggestions">Des suggestions pour améliorer cette bulle ou cette application ?</label><textarea id="feedback-suggestions" rows="2" maxlength="2000"></textarea>
+    <p id="feedback-error" class="form-error" role="alert"></p><div class="dialog-actions"><button id="feedback-submit" class="primary">Envoyer mon avis</button></div></form></dialog>
+  <dialog id="transcript-dialog"><form id="transcript-form"><h2>Corriger ce passage</h2><p>Corrige ce qui a été mal transcrit.</p><label for="transcript-text">Ce que tu as dit</label><textarea id="transcript-text" rows="5" maxlength="6000" required></textarea><p id="transcript-error" class="form-error" role="alert"></p><div class="dialog-actions"><button type="button" data-close="transcript-dialog">Annuler</button><button id="transcript-save" class="primary">Enregistrer</button></div></form></dialog>
 </body>
 </html>

@@ -1,5 +1,5 @@
-import { QUESTIONS, QUESTIONS_EN } from './coaching-protocol.js?v=0.4.0';
-import { t, getLanguage, initLanguage, setLanguage } from './i18n.js?v=0.4.0';
+import { QUESTIONS, QUESTIONS_EN } from './coaching-protocol.js?v=0.4.1';
+import { t, getLanguage, initLanguage, setLanguage } from './i18n.js?v=0.4.1';
 initLanguage(document);
 
 const $ = id => document.getElementById(id);
@@ -52,7 +52,6 @@ function render() {
     actions.append(edit,remove);card.append(actions);return card;
   }));
   $('note-empty').hidden=state.notes.length>0;
-  $('notion-next').hidden=Boolean(call)||Boolean(busy)||Boolean(pendingSave)||!(state.notes.length||state.calls?.length||state.messages.length>=2);
   renderFeedback();
   updateControls();
 }
@@ -221,26 +220,27 @@ function renderFeedback(){
   $('feedback-call-picker').hidden=state.calls.length<2;
   $('feedback-call').replaceChildren(...state.calls.map(c=>{const option=node('option','',date(c.ended_at));option.value=c.id;return option;}));
   $('feedback-call').value=recent.id;
-  $('feedback-prompt').textContent=t(recent.clarity===null?'Comment as-tu vécu cette bulle ? Ton retour est facultatif.':'Ton retour a été partagé avec l’équipe.');
-  $('feedback-button').textContent=t(recent.clarity===null?'Donner mon avis':'Modifier mon retour');
-  $('feedback-delete').hidden=recent.clarity===null;
+  $('feedback-prompt').textContent=t(recent.feedback_submitted?'Merci pour ton retour !':'Un retour sur ta bulle ?');
+  $('feedback-button').hidden=Boolean(recent.feedback_submitted);
 }
 $('language').onchange=()=>{setLanguage($('language').value,document);error();render();};
-for(const key of ['feedback-clarity','feedback-quality'])for(let i=0;i<=10;i++){const option=node('option','',String(i));option.value=String(i);$(key).append(option);}
+for(let i=0;i<=10;i++){
+  const label=node('label','nps-choice'),input=document.createElement('input');
+  input.type='radio';input.name='recommendation';input.value=String(i);input.required=true;input.setAttribute('aria-describedby','nps-help');
+  label.append(input,node('span','',String(i)));$('feedback-rating').append(label);
+}
 $('feedback-call').onchange=()=>{feedbackChoice=$('feedback-call').value;renderFeedback();};
 $('feedback-button').onclick=()=>{
-  feedbackCall=selectedFeedbackCall();if(!feedbackCall)return;
+  feedbackCall=selectedFeedbackCall();if(!feedbackCall||feedbackCall.feedback_submitted)return;
   $('feedback-form').reset();$('feedback-error').textContent='';
-  $('feedback-clarity').value=feedbackCall.clarity??'';$('feedback-quality').value=feedbackCall.quality??'';$('feedback-comment').value=feedbackCall.comment??'';
   $('feedback-dialog').showModal();
 };
 $('feedback-form').onsubmit=async event=>{
   event.preventDefault();if(!feedbackCall||!$('feedback-form').reportValidity())return;
-  $('feedback-submit').disabled=true;$('feedback-error').textContent='';
-  try{await api('feedback',{callId:feedbackCall.id,clarity:Number($('feedback-clarity').value),quality:Number($('feedback-quality').value),comment:$('feedback-comment').value,share:$('feedback-share').checked});await load();$('feedback-dialog').close();}
-  catch(e){$('feedback-error').textContent=e.message;}finally{$('feedback-submit').disabled=false;}
+  $('feedback-submit').disabled=true;$('feedback-form').setAttribute('aria-busy','true');$('feedback-error').textContent='';
+  try{await api('feedback',{callId:feedbackCall.id,recommendation:Number($('feedback-form').querySelector('input[name=recommendation]:checked').value),reason:$('feedback-reason').value,valueEstimate:$('feedback-value').value,suggestions:$('feedback-suggestions').value});await load();$('feedback-dialog').close();}
+  catch(e){$('feedback-error').textContent=e.message;}finally{$('feedback-submit').disabled=false;$('feedback-form').removeAttribute('aria-busy');}
 };
-$('feedback-delete').onclick=()=>guard(async()=>{const recent=selectedFeedbackCall();if(recent&&await confirm(t('Retirer ce retour ?'),t('Il disparaîtra du tableau de l’équipe.'))){await api(`feedback/${recent.id}`,undefined,'DELETE');await load();}});
 $('transcript-form').onsubmit=async event=>{
   event.preventDefault();$('transcript-save').disabled=true;$('transcript-error').textContent='';
   try{await api(`messages/${editingTranscript}`,{text:$('transcript-text').value},'PATCH');await load();$('transcript-dialog').close();}

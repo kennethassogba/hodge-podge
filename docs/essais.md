@@ -1,4 +1,4 @@
-# Essais — version 0.3.2
+# Essais — version 0.4.1
 
 ## Partager l’application
 
@@ -14,7 +14,9 @@ Chaque langue suit les 14 questions de son PDF original Kedo du 24 septembre 202
 
 ## Avis et mesures
 
-Après raccrochage, le formulaire est proposé sans s’ouvrir automatiquement. Deux notes obligatoires pour envoyer un avis : clarté gagnée, qualité ressentie (0–10), plus commentaire libre facultatif. Aucun partage tant que la case explicite n’est pas cochée et le bouton de partage activé. La personne peut modifier ou retirer son avis, y compris pour un appel précédent de la même séance.
+Après raccrochage, le formulaire est proposé sans s’ouvrir automatiquement. Il contient les quatre questions demandées en français et en anglais : recommandation de 0 à 10 (obligatoire), raison de la note, estimation libre de la valeur et suggestions (facultatives). Cliquer sur « Envoyer mon avis » transmet les réponses à l’équipe, sans autre confirmation. Un remerciement remplace ensuite le bouton ; pas de modification ou de retrait individuel dans l’interface. L’effacement de l’espace supprime toujours ses avis.
+
+Le NPS est calculé sur les réponses au nouveau questionnaire : 100 × (nombre de notes 9–10 − nombre de notes 0–6) / nombre total de réponses. Les notes 7–8 restent dans le dénominateur. Sans réponse, le score est absent (—), pas égal à zéro. Les anciens avis clarté/qualité restent consultables sans être mélangés au NPS. Une même réponse reçue plusieurs fois n’est comptée qu’une fois et n’est pas remplacée.
 
 Le tableau équipe affiche les avis et des chiffres agrégés. Il n’envoie pas les avis à OpenAI et ne lit pas les transcriptions pour calculer des scores. Il ne comporte pas d’API d’accès aux conversations ni aux notes. L’absence de nom n’est pas une garantie d’anonymat : un commentaire libre peut identifier quelqu’un. Ne pas recopier les avis hors du tableau sans nécessité.
 

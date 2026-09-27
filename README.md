@@ -79,11 +79,11 @@ Pour un autre compte, créer d’abord une base avec `npx wrangler d1 create hod
 
 Messages et appel WebRTC OpenAI, silences automatiques, reprise après interruption, historique, notes modifiables et supprimables, mémoire entre séances, effacement de l’espace et code d’accès. Le modèle texte choisit entre clarifier, reformuler, explorer et clôturer ; ce choix reste interne et n’apparaît pas dans l’interface. Un second appel au modèle prépare une note, dont la sauvegarde exige une action de la personne.
 
-L’agent vocal reçoit le fil récent et les notes approuvées. Realtime gère directement les tours de parole et les interruptions avec `semantic_vad`. Les 14 questions du PDF sont dans les instructions du modèle, qui doit les suivre dans l’ordre et mot pour mot, sauf demande explicite de répétition, explication, temps, passage de question, arrêt ou envie de passer à l’action. Le logiciel ne prétend ni lire un agenda ni envoyer un rappel. Notion, Telegram et les autres fournisseurs sont hors de cette version.
+L’agent vocal reçoit le fil récent et les notes approuvées. Realtime gère directement les tours de parole et les interruptions avec `semantic_vad`. Les 14 questions du PDF sont dans les instructions du modèle, qui doit les suivre dans l’ordre et mot pour mot, sauf demande explicite de répétition, explication, temps, passage de question, arrêt ou envie de passer à l’action. Le logiciel ne prétend ni lire un agenda ni envoyer un rappel. L’agenda, Telegram et les autres fournisseurs restent hors de cette version.
 
 ## Version 0.4.0 : suite facultative dans Notion
 
-Après la bulle, un lien ouvre `/notion.html`. La personne connecte Notion uniquement si elle souhaite poursuivre. Elle choisit une intention et quelques pages ; trois agents examinent les documents, vérifient les conclusions et préparent une nouvelle page à relire avant publication. Aucune transcription n’est jointe automatiquement. La connexion Notion sert aussi à retrouver cet espace sur plusieurs appareils. Configuration, limites, API et recette : [docs/notion.md](docs/notion.md).
+La navigation de l’accueil ouvre `/notion`. La personne connecte Notion uniquement si elle souhaite poursuivre. Elle choisit une intention et quelques pages ; trois agents examinent les documents, vérifient les conclusions et préparent une nouvelle page à relire avant publication. Aucune transcription n’est jointe automatiquement. La connexion Notion sert aussi à retrouver cet espace sur plusieurs appareils. Configuration, limites, API et recette : [docs/notion.md](docs/notion.md).
 
 Sans identifiants OAuth configurés, cette suite indique qu’elle n’est pas encore activée ; le coach fonctionne normalement. La migration `0003_notion.sql` est nécessaire avant déploiement.
 
@@ -91,7 +91,7 @@ Sans identifiants OAuth configurés, cette suite indique qu’elle n’est pas e
 
 - Choix FR/EN avant l’appel : interface, protocole, voix, transcription et brouillons de notes. Les notes et échanges existants ne sont pas traduits automatiquement. Les deux scripts originaux Kedo (FR et EN, 24 septembre 2026) sont dans `public/coaching-protocol.js`.
 - Filtrage OpenAI `far_field` pour micro intégré et `near_field` pour casque, en complément des traitements du navigateur. Une consigne privilégie le français de France et évite de répondre aux conversations lointaines. Cela ne garantit pas une immunité au bruit ni un accent parfait.
-- Après l’appel, retour facultatif : clarté gagnée et qualité ressentie de 0 à 10, commentaire optionnel, case de partage non cochée. Modifier ou retirer un retour depuis la séance ; aucun questionnaire oral ajouté au coaching.
+- Après l’appel, formulaire facultatif en quatre questions : recommandation 0–10, raison, valeur estimée et suggestions. Un seul envoi, sans case de partage ni commandes de modification. Le NPS apparaît dans le tableau équipe ; les anciens avis restent lisibles et ne sont pas comptés dans le NPS.
 - Les passages de transcription utilisateur sont corrigeables et supprimables avant préparation des notes. Les notes déjà approuvées restent à modifier séparément.
 - Tableau `/team.html`, code administrateur distinct, cookie HttpOnly de huit heures et déconnexion. Il affiche uniquement les avis explicitement partagés et des statistiques techniques agrégées : appels, fins enregistrées, durée, erreurs, interruptions détectées, échecs de transcription. Il n’expose pas les conversations ou notes. Les administrateurs de l’hébergement gardent un accès technique à la base.
 - Retours et métriques sont supprimés avec l’espace et expirent avec lui ; les chiffres du tableau peuvent donc diminuer. Une interruption n’est pas forcément un bug, et un avis n’est pas une mesure causale d’impact.
@@ -122,3 +122,7 @@ Le code administrateur de cette installation est dans `.dev.vars.admin`, ignoré
 Ce dépôt est le point central pour les trois membres. Les documents sont modifiables depuis GitHub. Les noms complets, la vidéo et le dépôt au hackathon restent à compléter. Échéance annoncée : 27 septembre 2026 à 23 h 59, fuseau à confirmer auprès de l’organisation.
 
 Référence de coaching : exemple Kedo transmis par Séb, daté du 24 septembre 2026. À la demande explicite de l’équipe, les 14 questions originales sont intégrées dans `public/coaching-protocol.js` avec leur attribution. Leur ordre et leur formulation servent de référence stricte. La fidélité vocale et la qualité de l’écoute restent à valider avec Séb. Police Manrope distribuée avec sa licence OFL dans `public/fonts/LICENSE-manrope.txt`.
+
+## Version 0.4.1
+
+Navigation permanente entre le coach et l’après-bulle, textes allégés, nouveau questionnaire FR/EN et NPS. Appliquer la migration additive `0004_nps.sql` avant déploiement. Le stockage des échanges reste côté serveur, lié au navigateur ; aucun stockage local exclusif n’est annoncé.

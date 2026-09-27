@@ -29,8 +29,8 @@ async function setup({cleanupThrows=false,language='fr'}={}){
     setTimeout:setTimer,clearTimeout:clearTimer,setInterval:fn=>{tickers.push(fn);return tickers.length;},clearInterval:()=>{},console,
     fetch:async (path,options)=>{
       const data=options?.body?JSON.parse(options.body):null;http.push({path,data});
-      if(path==='/api/call/end')uiState.calls=[{id:'fake-call-id',ended_at:Date.now(),language,clarity:null,quality:null,comment:null}];
-      if(path==='/api/feedback')Object.assign(uiState.calls[0],data);
+      if(path==='/api/call/end')uiState.calls=[{id:'fake-call-id',ended_at:Date.now(),language,feedback_submitted:0}];
+      if(path==='/api/feedback')Object.assign(uiState.calls[0],{feedback_submitted:1});
       return Response.json(path==='/api/status'?{ready:true}:path==='/api/call'?{callId:'fake-call-id',sdp:'v=0\r\n'}:path.startsWith('/api/state')?uiState:{ok:true});
     }});
 
@@ -90,16 +90,23 @@ test('English interface sends language and microphone choice, and feedback remai
     assert.equal(s.document.getElementById('feedback-dialog').open,false);
     assert.equal(s.http.filter(r=>r.path==='/api/feedback').length,0);
     s.document.getElementById('feedback-button').click();
-    assert.equal(s.document.getElementById('feedback-share').checked,false);
-    s.document.getElementById('feedback-clarity').value='0';s.document.getElementById('feedback-quality').value='10';
+    assert.equal(s.document.getElementById('feedback-share'),null);
+    assert.equal(s.document.getElementById('feedback-delete'),null);
+    assert.equal(s.document.querySelectorAll('input[name=recommendation]').length,11);
+    assert.equal(s.document.querySelector('legend').textContent,'How likely are you to recommend a coaching bubble to a friend or colleague?');
     s.document.getElementById('feedback-form').dispatchEvent(new s.window.Event('submit',{cancelable:true}));await s.settle();
     assert.equal(s.http.filter(r=>r.path==='/api/feedback').length,0);
-    s.document.getElementById('feedback-share').checked=true;
+    s.document.querySelector('input[name=recommendation][value="0"]').checked=true;
+    s.document.getElementById('feedback-reason').value='Useful reflection';
+    s.document.getElementById('feedback-value').value='An hour saved';
+    s.document.getElementById('feedback-suggestions').value='Keep it simple';
     s.document.getElementById('feedback-form').dispatchEvent(new s.window.Event('submit',{cancelable:true}));await s.settle();
-    const feedback=s.http.find(r=>r.path==='/api/feedback').data;assert.equal(feedback.share,true);assert.equal(feedback.clarity,0);assert.equal(feedback.messages,undefined);
-    assert.equal(s.document.getElementById('feedback-button').textContent,'Edit my feedback');
+    const feedback=s.http.find(r=>r.path==='/api/feedback').data;assert.equal(feedback.recommendation,0);assert.equal(feedback.reason,'Useful reflection');assert.equal(feedback.valueEstimate,'An hour saved');assert.equal(feedback.suggestions,'Keep it simple');assert.equal(feedback.messages,undefined);
+    assert.equal(s.document.getElementById('feedback-button').hidden,true);
+    assert.equal(s.document.getElementById('feedback-prompt').textContent,'Thanks for your feedback!');
     const select=s.document.getElementById('language');select.value='fr';select.dispatchEvent(new s.window.Event('change'));
-    assert.equal(s.document.querySelector('h1').textContent,'Ton espace pour parler');assert.equal(s.document.getElementById('feedback-button').textContent,'Modifier mon retour');
+    assert.equal(s.document.querySelector('h1').textContent,'Ton espace pour parler');assert.equal(s.document.getElementById('feedback-prompt').textContent,'Merci pour ton retour !');
+    assert.equal(s.document.querySelector('legend').textContent,'Quelle est la probabilité que tu recommandes une bulle de coaching à un ami ou un collègue ?');
   }finally{s.close();}
 });
 

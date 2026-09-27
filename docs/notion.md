@@ -1,6 +1,6 @@
 # Après la bulle — Notion (0.4.0)
 
-Le coaching conserve son parcours actuel. Aucun compte personnel ou accès Notion n’est demandé pour une bulle ; le code partagé des essais reste inchangé. Un lien discret apparaît après un échange ou une note. `/notion.html` accueille uniquement la suite facultative.
+Le coaching conserve son parcours actuel. Aucun compte personnel ou accès Notion n’est demandé pour une bulle ; le code partagé des essais reste inchangé. Un bouton permanent sur l’accueil ouvre `/notion`, la suite facultative. La page Notion propose aussi un retour direct vers la bulle.
 
 ## Activer OAuth
 

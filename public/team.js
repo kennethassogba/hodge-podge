@@ -1,4 +1,4 @@
-import {t,getLanguage,initLanguage,setLanguage} from './i18n.js?v=0.4.0';
+import {t,getLanguage,initLanguage,setLanguage} from './i18n.js?v=0.4.1';
 initLanguage(document);
 const $=id=>document.getElementById(id);
 let entries=[],nextOffset=null,summary=null,ratings=null;
@@ -11,11 +11,21 @@ function clear(){entries=[];summary=null;ratings=null;$('team-stats').replaceChi
 function render(){
   if(!summary)return;
   const fmt=(v,digits=0)=>v==null?'—':new Intl.NumberFormat(getLanguage()==='en'?'en-GB':'fr-FR',{maximumFractionDigits:digits}).format(v);
-  const cards=[['Appels démarrés',summary.calls],['Fins enregistrées',summary.ended??0],['Erreurs signalées',summary.errors??0],['Durée moyenne (min)',summary.average_seconds==null?null:summary.average_seconds/60],['Retours partagés',ratings.responses],['Clarté / 10',ratings.clarity],['Qualité / 10',ratings.quality],['Interruptions détectées',summary.interruptions],['Échecs de transcription',summary.transcription_failures]];
+  $('nps-score').textContent=fmt(ratings.nps,1);
+  $('nps-responses').textContent=`${fmt(ratings.responses)} ${t('Réponses NPS')}`;
+  $('nps-counts').replaceChildren(...[['Promoteurs',ratings.promoters],['Passifs',ratings.passives],['Détracteurs',ratings.detractors]].map(([label,value])=>{const item=el('div');item.append(el('strong',fmt(value)),el('span',t(label)));return item;}));
+  const cards=[['Appels démarrés',summary.calls],['Fins enregistrées',summary.ended??0],['Erreurs signalées',summary.errors??0],['Durée moyenne (min)',summary.average_seconds==null?null:summary.average_seconds/60],['Interruptions détectées',summary.interruptions],['Échecs de transcription',summary.transcription_failures]];
   $('team-stats').replaceChildren(...cards.map(([label,value])=>{const card=el('article','','stat-card');card.append(el('span',t(label)),el('strong',fmt(value,1)));return card;}));
   $('team-entries').replaceChildren(...entries.map(entry=>{
     const card=el('article','','feedback-entry');const when=new Intl.DateTimeFormat(getLanguage()==='en'?'en-GB':'fr-FR',{dateStyle:'medium',timeStyle:'short'}).format(entry.created_at);
-    card.append(el('p',`${when} · ${entry.language.toUpperCase()}`,'muted small'),el('p',`${t('Clarté')} ${entry.clarity}/10 · ${t('Qualité')} ${entry.quality}/10`),el('p',entry.comment||t('Aucun commentaire.'),'feedback-comment'));return card;
+    card.append(el('p',`${when} · ${entry.language.toUpperCase()}`,'muted small'));
+    if(entry.recommendation!=null){
+      card.append(el('p',`${t('Recommandation')} ${entry.recommendation}/10`));
+      const answers=el('dl');
+      for(const [label,value]of [['Raison',entry.reason],['Valeur créée',entry.value_estimate],['Suggestions',entry.suggestions]])if(value)answers.append(el('dt',t(label)),el('dd',value));
+      card.append(answers);
+    }else card.append(el('p',`${t('Ancien questionnaire')} · ${t('Clarté')} ${entry.clarity}/10 · ${t('Qualité')} ${entry.quality}/10`),el('p',entry.comment||t('Aucun commentaire.'),'feedback-comment'));
+    return card;
   }));
   if(!entries.length)$('team-entries').append(el('p',t('Aucun retour partagé pour le moment.'),'muted'));
   $('team-more').hidden=nextOffset===null;
