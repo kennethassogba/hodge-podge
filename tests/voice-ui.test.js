@@ -7,13 +7,27 @@ import { JSDOM } from 'jsdom';
 import { QUESTIONS } from '../public/coaching-protocol.js';
 
 // Run the actual UI handlers against fake transport events, not a second implementation.
-async function setup({cleanupThrows=false,language='fr',url='https://test.example',signedIn=true,autoCall=true,saveFails=false,saveErrors=[],refreshErrors=[]}={}){
+async function setup({cleanupThrows=false,language='fr',url='https://test.example',signedIn=true,autoCall=true,saveFails=false,saveErrors=[],refreshErrors=[],screenMode='unsupported'}={}){
   const dom=new JSDOM(await readFile('public/index.html','utf8'),{url});
   dom.window.localStorage.setItem('hp_language',language);
   const document=dom.window.document;
   dom.window.HTMLDialogElement.prototype.showModal=function(){this.open=true;};dom.window.HTMLDialogElement.prototype.close=function(){this.open=false;};document.getElementById('feed').scrollTo=()=>{};
   let authenticated=signedIn,didSave=false;
   if(saveFails)saveErrors=[500,500,500];
+  let visibility='visible',audio;
+  Object.defineProperty(document,'visibilityState',{get:()=>visibility});
+  const locks=[],grants=[];let screenRequests=0;
+  function makeLock(){
+    const lock=new dom.window.EventTarget();lock.released=false;
+    lock.release=async()=>{if(!lock.released){lock.released=true;lock.dispatchEvent(new dom.window.Event('release'));}};
+    locks.push(lock);return lock;
+  }
+  const wakeLock=screenMode==='unsupported'?undefined:{async request(type){
+    assert.equal(this,wakeLock);assert.equal(type,'screen');screenRequests++;
+    if(screenMode==='denied')throw new Error('System denied wake lock');
+    if(screenMode==='deferred')return new Promise(resolve=>grants.push(()=>resolve(makeLock())));
+    return makeLock();
+  }};
   let peer,clock=0,seq=0;const timers=new Map(),sent=[],http=[],tickers=[];
   const uiState={threadId:'fake-thread',threads:[{id:'fake-thread',created_at:Date.now()}],messages:[],notes:[],decisions:[],calls:[]};
   function validTimerReceiver(receiver){if(receiver && receiver!==dom.window && !receiver.document)throw new TypeError('Illegal invocation');}
@@ -26,8 +40,8 @@ async function setup({cleanupThrows=false,language='fr',url='https://test.exampl
     async setRemoteDescription(){this.channel.onopen();} close(){}
   }
   const track={stopped:false,stop(){this.stopped=true;},enabled:true};
-  const context=vm.createContext({document,window:dom.window,navigator:{onLine:true,mediaDevices:{getUserMedia:async()=>({getTracks:()=>[track],getAudioTracks:()=>[track]})}},
-    AbortController,RTCPeerConnection:Peer,Audio:class{constructor(){this.muted=false;}async play(){}pause(){}},crypto,
+  const context=vm.createContext({document,window:dom.window,navigator:{onLine:true,wakeLock,mediaDevices:{getUserMedia:async()=>({getTracks:()=>[track],getAudioTracks:()=>[track]})}},
+    AbortController,RTCPeerConnection:Peer,Audio:class{constructor(){audio=this;this.muted=false;this.paused=false;this.plays=0;}async play(){this.plays++;if(this.failPlay)throw new Error('Audio needs gesture');this.paused=false;}pause(){this.paused=true;}},crypto,
     setTimeout:setTimer,clearTimeout:clearTimer,setInterval:fn=>{tickers.push(fn);return tickers.length;},clearInterval:()=>{},console,
     fetch:async (path,options)=>{
       const data=options?.body?JSON.parse(options.body):null;http.push({path,data});
@@ -49,7 +63,7 @@ async function setup({cleanupThrows=false,language='fr',url='https://test.exampl
   if(autoCall){document.getElementById('call-button').click();await settle();}
   const emit=e=>peer.channel.onmessage({data:JSON.stringify(e)});
   function question(i){const id='response-'+i;emit({type:'response.created',response:{id}});emit({type:'response.output_item.added',item:{id:'item-'+i,role:'assistant'}});emit({type:'response.output_audio_transcript.done',response_id:id,item_id:'item-'+i,transcript:QUESTIONS[i]});emit({type:'response.done',response:{id,status:'completed'}});emit({type:'output_audio_buffer.stopped',response_id:id});}
-  return {document,window:dom.window,http,sent,emit,question,settle,track,close:()=>dom.window.close(),tick(ms){clock+=ms;for(const ticker of tickers)ticker();for(const [id,t]of [...timers])if(t.at<=clock){timers.delete(id);t.fn();}},requests:()=>sent.filter(x=>x.type==='response.create')};
+  return {document,window:dom.window,http,sent,emit,question,settle,track,locks,grants,screenRequests:()=>screenRequests,audio:()=>audio,visibility(value){visibility=value;document.dispatchEvent(new dom.window.Event('visibilitychange'));},close:()=>dom.window.close(),tick(ms){clock+=ms;for(const ticker of tickers)ticker();for(const [id,t]of [...timers])if(t.at<=clock){timers.delete(id);t.fn();}},requests:()=>sent.filter(x=>x.type==='response.create')};
 }
 test('native replies are accepted after each user turn without client timers or transcription',async()=>{
   const s=await setup();try{
@@ -471,4 +485,77 @@ test('invalid or unauthorized saves are not automatically retried',async()=>{
       assert(!s.document.body.classList.contains('leaving-bubble'));
     }finally{s.close();}
   }
+});
+
+test('the screen stays awake only during a call and is released even if transport cleanup throws',async()=>{
+  const s=await setup({screenMode:'supported',cleanupThrows:true,autoCall:false});try{
+    assert.equal(s.screenRequests(),0);
+    s.document.getElementById('call-button').click();await s.settle();
+    assert.equal(s.screenRequests(),1);assert.equal(s.locks[0].released,false);
+    assert.equal(s.document.getElementById('call-hint').textContent,'L’écran reste allumé pendant l’appel.');
+    s.visibility('visible');await s.settle();assert.equal(s.screenRequests(),1);
+    s.document.getElementById('hangup-button').click();await s.settle();
+    assert.equal(s.locks[0].released,true);
+    s.visibility('visible');await s.settle();assert.equal(s.screenRequests(),1);
+  }finally{s.close();}
+});
+test('returning to a visible call restores wake protection and audio without asking a new question',async()=>{
+  const s=await setup({screenMode:'supported'});try{
+    s.question(0);const responses=s.requests().length;
+    s.audio().srcObject={};s.audio().paused=true;
+    s.visibility('hidden');await s.settle();assert.equal(s.locks[0].released,true);
+    assert.equal(s.screenRequests(),1);assert.equal(s.audio().plays,0);
+    s.visibility('visible');await s.settle();
+    assert.equal(s.screenRequests(),2);assert.equal(s.locks[1].released,false);
+    assert.equal(s.audio().paused,false);assert.equal(s.audio().plays,1);
+    assert.equal(s.requests().length,responses);
+    assert.equal(s.document.getElementById('call-panel').hidden,false);
+  }finally{s.close();}
+});
+test('unsupported or denied screen protection never prevents coaching',async()=>{
+  for(const screenMode of ['unsupported','denied']){
+    const s=await setup({screenMode,language:'en'});try{
+      s.question(0);
+      assert.equal(s.document.getElementById('call-panel').hidden,false);
+      assert.equal(s.document.getElementById('error').hidden,true);
+      assert.equal(s.document.getElementById('call-hint').textContent,'Keep this screen open during the call.');
+      assert.equal(s.requests().length,1);
+    }finally{s.close();}
+  }
+});
+test('a delayed wake lock is released if the call ended or the page became hidden',async()=>{
+  for(const end of [true,false]){
+    const s=await setup({screenMode:'deferred'});try{
+      assert.equal(s.screenRequests(),1);
+      s.visibility('visible');await s.settle();assert.equal(s.screenRequests(),1);
+      if(end)s.document.getElementById('hangup-button').click();else s.visibility('hidden');
+      await s.settle();s.grants.shift()();await s.settle();
+      assert.equal(s.locks[0].released,true);
+      if(!end){s.visibility('visible');await s.settle();assert.equal(s.screenRequests(),2);s.grants.shift()();await s.settle();assert.equal(s.locks[1].released,false);}
+    }finally{s.close();}
+  }
+});
+test('system revocation updates the hint without a retry loop; timeout and page exit release the lock',async()=>{
+  const s=await setup({screenMode:'supported'});try{
+    await s.locks[0].release();await s.settle();assert.equal(s.screenRequests(),1);
+    assert.equal(s.document.getElementById('call-hint').textContent,'Garde cet écran ouvert pendant l’appel.');
+    s.visibility('hidden');s.visibility('visible');await s.settle();
+    s.tick(1200000);await s.settle();assert.equal(s.locks[1].released,true);
+  }finally{s.close();}
+  const leaving=await setup({screenMode:'supported'});try{
+    leaving.window.dispatchEvent(new leaving.window.Event('pagehide'));await leaving.settle();
+    assert.equal(leaving.locks[0].released,true);assert.equal(leaving.track.stopped,true);
+  }finally{leaving.close();}
+});
+test('blocked audio resume asks for one tap and never advances the protocol',async()=>{
+  const s=await setup({screenMode:'supported',language:'en'});try{
+    s.question(0);const responses=s.requests().length;
+    s.audio().srcObject={};s.audio().paused=true;s.audio().failPlay=true;
+    s.visibility('hidden');s.visibility('visible');await s.settle();
+    assert.equal(s.document.getElementById('call-hint').textContent,'Tap the screen to resume audio.');
+    assert.equal(s.document.getElementById('call-panel').hidden,false);
+    s.audio().failPlay=false;s.document.dispatchEvent(new s.window.Event('click'));await s.settle();
+    assert.equal(s.audio().paused,false);assert.equal(s.requests().length,responses);
+    assert.equal(s.document.getElementById('call-hint').textContent,'The screen stays on during the call.');
+  }finally{s.close();}
 });

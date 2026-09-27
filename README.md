@@ -77,7 +77,8 @@ par le serveur. Ce lien donne accès aux essais : le partager avec les personnes
    notes** restent la mémoire approuvée du coach ; le récap ne les remplace pas automatiquement.
 
 Un casque est conseillé. L’appel s’arrête après vingt minutes dans l’interface. Le navigateur doit
-rester ouvert.
+rester ouvert. Pendant l’appel, l’application demande de maintenir l’écran allumé pour éviter la
+veille automatique. Un verrouillage manuel ou un refus du système peut encore suspendre l’appel.
 
 Pour essayer les agents Notion, ouvrir **Continuer dans Notion** dans l’après-bulle, connecter son
 espace, compléter le récap si nécessaire et sélectionner 1 à 3 pages. Cliquer sur **Examiner ces

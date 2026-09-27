@@ -71,6 +71,25 @@ sauvegarde, la transcription reste en mémoire dans l’onglet et le bouton de r
 y compris si une reprise manuelle échoue aussi. L’onglet doit rester ouvert. Le passage à
 l’après-bulle attend une sauvegarde confirmée et le chargement du fil.
 
+## Téléphone et mise en veille
+
+Pendant un appel actif, l’application demande un Screen Wake Lock pour empêcher la veille
+automatique de l’écran. Elle le libère au raccrochage, à la limite de vingt minutes et à la sortie
+de la page. Une autorisation reçue après la fin de l’appel est immédiatement libérée.
+
+Le retour sur une page visible redemande cette protection. Si le navigateur a suspendu la lecture
+audio, l’application tente de la reprendre ; si un geste est nécessaire, une courte indication
+invite à toucher l’écran. Ce retour n’envoie aucune nouvelle question au modèle.
+
+Une API absente ou un refus du système ne bloque pas l’appel : l’indication invite à garder
+l’écran ouvert. Un verrouillage manuel, un changement d’application ou une batterie faible peut
+suspendre le navigateur. Ce correctif ne garantit pas un appel écran verrouillé, ni la récupération
+d’une connexion WebRTC coupée. Un essai sur iPhone reste nécessaire pour valider le comportement
+réel du système, au-delà des tests simulés de visibilité et de refus.
+
+Références : [Screen Wake Lock](https://www.w3.org/TR/screen-wake-lock/) et
+[suspension des pages par WebKit](https://webkit.org/blog/8970/how-web-content-can-affect-power-usage/).
+
 ## Vérification
 
 Les tests de `tests/voice-ui.test.js` exécutent le vrai contrôleur avec des événements WebRTC fictifs.

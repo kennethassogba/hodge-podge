@@ -1,7 +1,7 @@
-import { takeAccessCode, afterLink, goAfter } from './access.js?v=0.5.4';
-import { voiceResponseDiagnostic } from './voice-diagnostics.js?v=0.5.4';
-import { QUESTIONS, QUESTIONS_EN } from './coaching-protocol.js?v=0.5.4';
-import { t, getLanguage, initLanguage, setLanguage } from './i18n.js?v=0.5.4';
+import { takeAccessCode, afterLink, goAfter } from './access.js?v=0.5.5';
+import { voiceResponseDiagnostic } from './voice-diagnostics.js?v=0.5.5';
+import { QUESTIONS, QUESTIONS_EN } from './coaching-protocol.js?v=0.5.5';
+import { t, getLanguage, initLanguage, setLanguage } from './i18n.js?v=0.5.5';
 const invitationCode = takeAccessCode();
 initLanguage(document);
 
@@ -150,7 +150,7 @@ function recoverResponse(c,response) {
 function callStatus(c,label,speaking=false){
   if(call!==c)return;
   $('call-status').textContent=t(label);
-  $('call-hint').textContent=t('Parle naturellement. Tu peux interrompre le coach.');
+  callScreenHint(c,Boolean(c.screenLock&&!c.screenLock.released));
   $('call-panel').dataset.state=speaking?'speaking':'listening';
 }
 function interrupted(c){
@@ -279,6 +279,44 @@ function handleEvent(c,e) {
     void endCall(t('La connexion vocale a rencontré une erreur. Tu peux relancer l’appel.'));
   }
 }
+function callScreenHint(c,awake){
+  if(call!==c)return;
+  $('call-hint').textContent=t(c.resumeAudioNeeded?'Touche l’écran pour reprendre le son.':
+    awake?'L’écran reste allumé pendant l’appel.':'Garde cet écran ouvert pendant l’appel.');
+}
+async function keepCallAwake(c){
+  if(call!==c||c.ending||document.visibilityState!=='visible'||c.screenRequest||c.screenLock&&!c.screenLock.released)return;
+  if(!navigator.wakeLock?.request){callScreenHint(c,false);return;}
+  c.screenRequest=true;
+  try{
+    const lock=await navigator.wakeLock.request('screen');
+    // A delayed grant must not keep the screen awake after hangup or while the page is hidden.
+    if(call!==c||c.ending||document.visibilityState!=='visible'){await lock.release();return;}
+    c.screenLock=lock;callScreenHint(c,true);
+    lock.addEventListener('release',()=>{
+      if(c.screenLock===lock){c.screenLock=null;callScreenHint(c,false);}
+    });
+  }catch{callScreenHint(c,false);}finally{c.screenRequest=false;}
+}
+function releaseCallScreen(c){
+  const lock=c.screenLock;c.screenLock=null;
+  if(lock)void lock.release().catch(()=>{});
+}
+async function resumeCallAudio(c){
+  if(call!==c||c.ending||!c.audio.srcObject||!c.audio.paused)return;
+  try{await c.audio.play();c.resumeAudioNeeded=false;}
+  catch{c.resumeAudioNeeded=true;}
+  callScreenHint(c,Boolean(c.screenLock&&!c.screenLock.released));
+}
+document.addEventListener('visibilitychange',()=>{
+  const c=call;if(!c||!c.started)return;
+  if(document.visibilityState==='visible'){
+    void keepCallAwake(c);void resumeCallAudio(c);
+  }else releaseCallScreen(c);
+});
+document.addEventListener('click',()=>{
+  if(call?.resumeAudioNeeded)void resumeCallAudio(call);
+});
 async function startCall(){
   if(!access()||call||busy||pendingSave)return;
   if(!navigator.mediaDevices?.getUserMedia)throw new Error(t('Le micro nécessite HTTPS ou localhost et un navigateur compatible.'));
@@ -286,7 +324,7 @@ async function startCall(){
   try{await ensureThread();}finally{busy=false;updateControls();}
   const c={peer:new RTCPeerConnection(),audio:new Audio(),stream:null,channel:null,callId:null,sequence:0,transcript:new Map(),currentItems:new Set(),ignoredResponses:new Set(),doneResponses:new Set(),requests:new Map(),recoveryAttempts:0,turn:0,responseTurn:0,pause:null,responseId:null,speaking:false,playing:false,ending:false,interruptions:0,transcriptionFailures:0};
   call=c;render();$('call-panel').hidden=false;$('call-status').textContent=t('Autorise le micro pour commencer.');$('call-time').textContent='00:00';
-  c.audio.autoplay=true;
+  c.audio.autoplay=true;callScreenHint(c,false);
   try{
     const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
     if(call!==c){stream.getTracks().forEach(t=>t.stop());return;}
@@ -296,6 +334,7 @@ async function startCall(){
     c.channel.onmessage=e=>{try{handleEvent(c,JSON.parse(e.data));}catch{void endCall(t('La connexion vocale a rencontré un problème. Tu peux relancer l’appel.'));}};
     c.channel.onopen=()=>{
       if(call!==c)return;clearTimeout(c.connectionTimer);c.started=Date.now();callStatus(c,t('Le coach prépare sa réponse…'));
+      void keepCallAwake(c);
       c.limitTimer=setTimeout(()=>{if(call===c)void endCall(t('Les vingt minutes sont écoulées. Tu peux garder quelques notes.'),'ended');},1200000);
       c.ticker=setInterval(()=>{const seconds=Math.floor((Date.now()-c.started)/1000);$('call-time').textContent=`${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`;if(seconds>=1200)void endCall(t('Les vingt minutes sont écoulées. Tu peux garder quelques notes.'),'ended');},1000);
       // Native VAD creates all later responses; the client only requests the greeting.
@@ -353,7 +392,7 @@ async function retrySave(){
 }
 async function endCall(message='',outcome=message?'error':'ended'){
   const c=call;if(!c||c.ending)return;c.ending=true;
-  cancelPause(c);
+  cancelPause(c);releaseCallScreen(c);
   clearTimeout(c.recoveryTimer);
   clearTimeout(c.finishTimer);clearInterval(c.ticker);clearTimeout(c.limitTimer);clearTimeout(c.connectionTimer);clearTimeout(c.responseTimer);
   // Reset the UI first. A failed transport cleanup must never leave the call stuck.
@@ -372,7 +411,7 @@ $('hangup-button').onclick=()=>{void endCall();};
 window.addEventListener('offline',()=>{document.body.classList.add('offline');error(t('Tu es hors connexion. Ton message reste ici.'));if(call)void endCall(t('Connexion perdue. Garde cette page ouverte pour sauvegarder le fil.'));updateControls();});
 window.addEventListener('online',()=>{document.body.classList.remove('offline');updateControls();if(pendingSave)void retrySave();else error();});
 window.addEventListener('beforeunload',event=>{if(call||pendingSave){event.preventDefault();event.returnValue='';}});
-window.addEventListener('pagehide',()=>{if(call){call.stream?.getTracks().forEach(t=>t.stop());call.peer.close();}});
+window.addEventListener('pagehide',()=>{if(call){releaseCallScreen(call);call.stream?.getTracks().forEach(t=>t.stop());call.peer.close();}});
 
 let feedbackCall=null,editingTranscript=null,feedbackChoice=null;
 const selectedFeedbackCall=()=>state.calls?.find(c=>c.id===feedbackChoice)??state.calls?.[0];
