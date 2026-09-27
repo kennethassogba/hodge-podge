@@ -492,7 +492,8 @@ test('the screen stays awake only during a call and is released even if transpor
     assert.equal(s.screenRequests(),0);
     s.document.getElementById('call-button').click();await s.settle();
     assert.equal(s.screenRequests(),1);assert.equal(s.locks[0].released,false);
-    assert.equal(s.document.getElementById('call-hint').textContent,'L’écran reste allumé pendant l’appel.');
+    assert.equal(s.document.getElementById('call-hint').textContent,'');
+    assert.equal(s.document.getElementById('call-hint').hidden,true);
     s.visibility('visible');await s.settle();assert.equal(s.screenRequests(),1);
     s.document.getElementById('hangup-button').click();await s.settle();
     assert.equal(s.locks[0].released,true);
@@ -556,6 +557,7 @@ test('blocked audio resume asks for one tap and never advances the protocol',asy
     assert.equal(s.document.getElementById('call-panel').hidden,false);
     s.audio().failPlay=false;s.document.dispatchEvent(new s.window.Event('click'));await s.settle();
     assert.equal(s.audio().paused,false);assert.equal(s.requests().length,responses);
-    assert.equal(s.document.getElementById('call-hint').textContent,'The screen stays on during the call.');
+    assert.equal(s.document.getElementById('call-hint').textContent,'');
+    assert.equal(s.document.getElementById('call-hint').hidden,true);
   }finally{s.close();}
 });

@@ -1,7 +1,7 @@
-import { takeAccessCode, afterLink, goAfter } from './access.js?v=0.5.5';
-import { voiceResponseDiagnostic } from './voice-diagnostics.js?v=0.5.5';
-import { QUESTIONS, QUESTIONS_EN } from './coaching-protocol.js?v=0.5.5';
-import { t, getLanguage, initLanguage, setLanguage } from './i18n.js?v=0.5.5';
+import { takeAccessCode, afterLink, goAfter } from './access.js?v=0.5.6';
+import { voiceResponseDiagnostic } from './voice-diagnostics.js?v=0.5.6';
+import { QUESTIONS, QUESTIONS_EN } from './coaching-protocol.js?v=0.5.6';
+import { t, getLanguage, initLanguage, setLanguage } from './i18n.js?v=0.5.6';
 const invitationCode = takeAccessCode();
 initLanguage(document);
 
@@ -282,7 +282,8 @@ function handleEvent(c,e) {
 function callScreenHint(c,awake){
   if(call!==c)return;
   $('call-hint').textContent=t(c.resumeAudioNeeded?'Touche l’écran pour reprendre le son.':
-    awake?'L’écran reste allumé pendant l’appel.':'Garde cet écran ouvert pendant l’appel.');
+    awake?'':'Garde cet écran ouvert pendant l’appel.');
+  $('call-hint').hidden=!$('call-hint').textContent;
 }
 async function keepCallAwake(c){
   if(call!==c||c.ending||document.visibilityState!=='visible'||c.screenRequest||c.screenLock&&!c.screenLock.released)return;
